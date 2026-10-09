@@ -1,10 +1,8 @@
 --[[
     ============================================
-    ALATFERA LIB V11 - UI EDITION
-    Thêm: Lock GUI, Save/Load Preset,
-          Keybind, Paragraph, Divider,
-          ProgressBar, Image, Tooltip
-    API 100% tương thích V10
+    ALATFERA LIB V12 - VISUAL EDITION
+    Thêm: Blur Background, Particle Effects
+    API 100% tương thích V11
     ============================================
 ]]
 
@@ -19,6 +17,7 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
+local Lighting = game:GetService("Lighting")
 
 local ParentContainer = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
@@ -91,7 +90,7 @@ end
 function AlatferaLib.CreateWindow(config)
     config = config or {}
     local hubTitle       = config.Title or "Alatfera Script"
-    local hubVersion     = config.Version or "v11.0"
+    local hubVersion     = config.Version or "v12.0"
     local showPlaytime   = (config.ShowPlaytime == nil) and true or config.ShowPlaytime
     local scriptNameText = config.LoadingScriptName or "Alatfera Script"
     local statusText     = config.LoadingStatus or "Đang tải giao diện..."
@@ -106,6 +105,13 @@ function AlatferaLib.CreateWindow(config)
     local discordLink  = config.DiscordLink or "https://discord.gg/alatfera"
     local maxAttempts  = config.MaxAttempts or 10
     local remainingAttempts = maxAttempts
+
+    -- === VISUAL EFFECTS (V12) ===
+    local enableBlur = (config.BlurBackground == nil) and true or config.BlurBackground
+    local enableParticles = (config.ParticleEffects == nil) and true or config.ParticleEffects
+    local blurSize = config.BlurSize or 20
+    local particleCount = config.ParticleCount or 15
+    local particleColor = ParseColor(config.ParticleColor, themeColor)
 
     local configFile = config.ConfigFile or "Alatfera_Config.json"
     local savedData = {}
@@ -326,8 +332,8 @@ function AlatferaLib.CreateWindow(config)
     Window.ThemeColor = themeColor
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0.75, 0, 0.8, 0)
-    MainFrame.Position = UDim2.new(0.125, 0, 0.1, 0)
+    MainFrame.Size = UDim2.new(0.70, 0, 0.88, 0)
+    MainFrame.Position = UDim2.new(0.15, 0, 0.06, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
@@ -338,6 +344,80 @@ function AlatferaLib.CreateWindow(config)
     end
     local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
     TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
+    -- ═══════════════════════════════════════════
+    -- BLUR BACKGROUND (V12)
+    -- ═══════════════════════════════════════════
+    local blurEffect = nil
+    if enableBlur then
+        blurEffect = Instance.new("BlurEffect")
+        blurEffect.Size = 0
+        blurEffect.Parent = Lighting
+        TweenService:Create(blurEffect, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = blurSize}):Play()
+    end
+
+    -- ═══════════════════════════════════════════
+    -- PARTICLE EFFECTS (V12)
+    -- ═══════════════════════════════════════════
+    local particleContainer = nil
+    local particleList = {}
+    local particleConn = nil
+
+    local function createParticles()
+        particleContainer = Instance.new("Frame")
+        particleContainer.Name = "ParticleContainer"
+        particleContainer.Size = UDim2.new(1, 0, 1, 0)
+        particleContainer.BackgroundTransparency = 1
+        particleContainer.ZIndex = 0
+        particleContainer.Parent = ScreenGui
+
+        particleList = {}
+        for i = 1, particleCount do
+            local p = Instance.new("Frame")
+            local size = math.random(3, 8)
+            p.Size = UDim2.new(0, size, 0, size)
+            p.Position = UDim2.new(math.random(), 0, math.random(), 0)
+            p.BackgroundColor3 = particleColor
+            p.BorderSizePixel = 0
+            p.BackgroundTransparency = math.random(40, 80) / 100
+            p.ZIndex = 0
+            p.Parent = particleContainer
+
+            local pc = Instance.new("UICorner")
+            pc.CornerRadius = UDim.new(1, 0)
+            pc.Parent = p
+
+            table.insert(particleList, {
+                frame = p,
+                speed = math.random(15, 50) / 1000,
+                drift = (math.random() - 0.5) * 0.0008,
+                wobble = math.random() * math.pi * 2,
+            })
+        end
+
+        particleConn = RunService.RenderStepped:Connect(function(dt)
+            for _, data in ipairs(particleList) do
+                local p = data.frame
+                if p and p.Parent then
+                    data.wobble = data.wobble + dt * 2
+                    local newY = p.Position.Y.Scale - data.speed * dt * 60
+                    local newX = p.Position.X.Scale + data.drift + math.sin(data.wobble) * 0.0005
+                    if newY < -0.05 then
+                        newY = 1.05
+                        newX = math.random()
+                    end
+                    if newX < -0.05 then newX = 1.05
+                    elseif newX > 1.05 then newX = -0.05 end
+                    p.Position = UDim2.new(newX, 0, newY, 0)
+                end
+            end
+        end)
+        Track(particleConn)
+    end
+
+    if enableParticles then
+        createParticles()
+    end
 
     -- Topbar
     local Topbar = Instance.new("Frame")
@@ -415,7 +495,7 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(12, 14, 19)}):Play()
     end))
 
-    -- === LOCK BUTTON (MỚI V11) ===
+    -- === LOCK BUTTON ===
     local isLocked = false
     local LockBtn = Instance.new("TextButton")
     LockBtn.Size = UDim2.new(0, 34, 0, 34); LockBtn.Position = UDim2.new(1, -186, 0, 6)
@@ -503,10 +583,10 @@ function AlatferaLib.CreateWindow(config)
         isMinimized = not isMinimized
         if isMinimized then
             MinimizeBtn.Text = "↓"
-            MainFrame:TweenSize(UDim2.new(0.75, 0, 0, 46), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
+            MainFrame:TweenSize(UDim2.new(0.70, 0, 0, 46), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
         else
             MinimizeBtn.Text = "↑"
-            MainFrame:TweenSize(UDim2.new(0.75, 0, 0.8, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
+            MainFrame:TweenSize(UDim2.new(0.70, 0, 0.88, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
         end
     end))
 
@@ -529,7 +609,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- Drag (tôn trọng isLocked)
+    -- Drag
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
         if isLocked then return end
@@ -728,7 +808,7 @@ function AlatferaLib.CreateWindow(config)
         end))
     end
 
-    -- ============ PRESET METHODS (MỚI V11) ============
+    -- ============ PRESET METHODS ============
     function Window:SavePreset(name)
         if not name or name == "" then return false end
         if not savedData["_Presets"] then savedData["_Presets"] = {} end
@@ -855,7 +935,7 @@ function AlatferaLib.CreateWindow(config)
             return Label
         end
 
-        -- ===== WIDGET: PARAGRAPH (MỚI V11) =====
+        -- ===== WIDGET: PARAGRAPH =====
         function Tab:CreateParagraph(text)
             local Wrap = Instance.new("Frame")
             Wrap.Size = UDim2.new(1, -10, 0, 0)
@@ -887,7 +967,7 @@ function AlatferaLib.CreateWindow(config)
             return Wrap
         end
 
-        -- ===== WIDGET: DIVIDER (MỚI V11) =====
+        -- ===== WIDGET: DIVIDER =====
         function Tab:CreateDivider()
             local Div = Instance.new("Frame")
             Div.Size = UDim2.new(1, -20, 0, 1)
@@ -926,7 +1006,7 @@ function AlatferaLib.CreateWindow(config)
             Button.Text = btnText; Button.TextColor3 = Color3.fromRGB(240, 240, 245)
             Button.Font = Enum.Font.Gotham; Button.TextSize = 13
             Button.Parent = TabContainer
-            local BC = Instance.new("UICorner"); BC.CornerRadius = UDim.new(0, cornerRadius); BC.Parent = Button
+            local BC3 = Instance.new("UICorner"); BC3.CornerRadius = UDim.new(0, cornerRadius); BC3.Parent = Button
             if enableStroke then
                 local BS = Instance.new("UIStroke"); BS.Color = strokeColor; BS.Thickness = 1; BS.Parent = Button
             end
@@ -1257,7 +1337,7 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
-        -- ===== WIDGET: KEYBIND (MỚI V11) =====
+        -- ===== WIDGET: KEYBIND =====
         function Tab:CreateKeybind(labelText, flagName, defaultKey, callback)
             callback = callback or function() end
             local currentKey = defaultKey or Enum.KeyCode.Unknown
@@ -1335,7 +1415,7 @@ function AlatferaLib.CreateWindow(config)
             }
         end
 
-        -- ===== WIDGET: PROGRESS BAR (MỚI V11) =====
+        -- ===== WIDGET: PROGRESS BAR =====
         function Tab:CreateProgressBar(labelText, initialPercent)
             local percent = math.clamp(initialPercent or 0, 0, 100)
 
@@ -1387,7 +1467,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- ===== WIDGET: IMAGE (MỚI V11 - TÙY CHỌN) =====
+        -- ===== WIDGET: IMAGE =====
         function Tab:CreateImage(imageId, height)
             if not imageId then return nil end
             local h = height or 100
@@ -1418,6 +1498,48 @@ function AlatferaLib.CreateWindow(config)
         return Tab
     end
 
+    -- ============ BẬT/TẮT VISUAL EFFECTS (V12) ============
+    function Window:SetBlur(enabled)
+        if enabled then
+            if not blurEffect or not blurEffect.Parent then
+                blurEffect = Instance.new("BlurEffect")
+                blurEffect.Size = 0
+                blurEffect.Parent = Lighting
+            end
+            TweenService:Create(blurEffect, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = blurSize}):Play()
+        else
+            if blurEffect and blurEffect.Parent then
+                TweenService:Create(blurEffect, TweenInfo.new(0.4, Enum.EasingStyle.Quart), {Size = 0}):Play()
+            end
+        end
+    end
+
+    function Window:SetParticles(enabled)
+        if enabled then
+            if not particleContainer or not particleContainer.Parent then
+                createParticles()
+            end
+        else
+            if particleConn then
+                particleConn:Disconnect()
+                particleConn = nil
+            end
+            if particleContainer and particleContainer.Parent then
+                particleContainer:Destroy()
+                particleContainer = nil
+            end
+            particleList = {}
+        end
+    end
+
+    function Window:IsBlurEnabled()
+        return blurEffect ~= nil and blurEffect.Parent and blurEffect.Size > 0
+    end
+
+    function Window:IsParticlesEnabled()
+        return particleContainer ~= nil and particleContainer.Parent ~= nil
+    end
+
     -- ============ DESTROY ============
     function Window:Destroy()
         TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
@@ -1426,6 +1548,8 @@ function AlatferaLib.CreateWindow(config)
             pcall(function() conn:Disconnect() end)
         end
         connections = {}
+        if blurEffect and blurEffect.Parent then blurEffect:Destroy() end
+        if particleContainer and particleContainer.Parent then particleContainer:Destroy() end
         if ScreenGui then ScreenGui:Destroy() end
     end
 
