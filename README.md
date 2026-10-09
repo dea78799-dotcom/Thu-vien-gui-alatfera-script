@@ -1,6 +1,7 @@
 --[[
     ============================================
-    ALATFERA LIB V12.1 - VISUAL EDITION (FIXED)
+    ALATFERA LIB V12.2 - SLIDER INPUT EDITION
+    Thêm: Ô nhập số bên cạnh slider
     Fix: Tắt GUI → tự động tắt Blur + Particle
     API 100% tương thích V11
     ============================================
@@ -90,7 +91,7 @@ end
 function AlatferaLib.CreateWindow(config)
     config = config or {}
     local hubTitle       = config.Title or "Alatfera Script"
-    local hubVersion     = config.Version or "v12.1"
+    local hubVersion     = config.Version or "v12.2"
     local showPlaytime   = (config.ShowPlaytime == nil) and true or config.ShowPlaytime
     local scriptNameText = config.LoadingScriptName or "Alatfera Script"
     local statusText     = config.LoadingStatus or "Đang tải giao diện..."
@@ -106,7 +107,6 @@ function AlatferaLib.CreateWindow(config)
     local maxAttempts  = config.MaxAttempts or 10
     local remainingAttempts = maxAttempts
 
-    -- === VISUAL EFFECTS ===
     local enableBlur = (config.BlurBackground == nil) and true or config.BlurBackground
     local enableParticles = (config.ParticleEffects == nil) and true or config.ParticleEffects
     local blurSize = config.BlurSize or 20
@@ -345,13 +345,10 @@ function AlatferaLib.CreateWindow(config)
     local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
     TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
-    -- ✅ FIX: Biến lưu trạng thái Blur/Particle khi đóng GUI
     local savedBlurState = enableBlur
     local savedParticleState = enableParticles
 
-    -- ═══════════════════════════════════════════
-    -- BLUR BACKGROUND
-    -- ═══════════════════════════════════════════
+    -- BLUR
     local blurEffect = nil
     if enableBlur then
         blurEffect = Instance.new("BlurEffect")
@@ -360,9 +357,7 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(blurEffect, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = blurSize}):Play()
     end
 
-    -- ═══════════════════════════════════════════
-    -- PARTICLE EFFECTS
-    -- ═══════════════════════════════════════════
+    -- PARTICLES
     local particleContainer = nil
     local particleList = {}
     local particleConn = nil
@@ -404,12 +399,8 @@ function AlatferaLib.CreateWindow(config)
                     data.wobble = data.wobble + dt * 2
                     local newY = p.Position.Y.Scale - data.speed * dt * 60
                     local newX = p.Position.X.Scale + data.drift + math.sin(data.wobble) * 0.0005
-                    if newY < -0.05 then
-                        newY = 1.05
-                        newX = math.random()
-                    end
-                    if newX < -0.05 then newX = 1.05
-                    elseif newX > 1.05 then newX = -0.05 end
+                    if newY < -0.05 then newY = 1.05; newX = math.random() end
+                    if newX < -0.05 then newX = 1.05 elseif newX > 1.05 then newX = -0.05 end
                     p.Position = UDim2.new(newX, 0, newY, 0)
                 end
             end
@@ -417,11 +408,9 @@ function AlatferaLib.CreateWindow(config)
         Track(particleConn)
     end
 
-    if enableParticles then
-        createParticles()
-    end
+    if enableParticles then createParticles() end
 
-    -- ============ TOPBAR ============
+    -- TOPBAR
     local Topbar = Instance.new("Frame")
     Topbar.Size = UDim2.new(1, 0, 0, 46)
     Topbar.BackgroundColor3 = Color3.fromRGB(20, 23, 32); Topbar.BorderSizePixel = 0
@@ -470,14 +459,12 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- Close
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.new(0, 34, 0, 34); CloseBtn.Position = UDim2.new(1, -42, 0, 6)
     CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "✕"
     CloseBtn.TextColor3 = Color3.fromRGB(245, 70, 90); CloseBtn.TextSize = 17
     CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.Parent = Topbar
 
-    -- Search
     local SearchBox = Instance.new("TextBox")
     SearchBox.Size = UDim2.new(0, 160, 0, 28); SearchBox.Position = UDim2.new(1, -350, 0, 9)
     SearchBox.BackgroundColor3 = Color3.fromRGB(12, 14, 19); SearchBox.Text = ""
@@ -490,31 +477,18 @@ function AlatferaLib.CreateWindow(config)
     if enableStroke then
         local SrS = Instance.new("UIStroke"); SrS.Color = strokeColor; SrS.Thickness = 1; SrS.Parent = SearchBox
     end
-    Track(SearchBox.Focused:Connect(function()
-        TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 24, 34)}):Play()
-    end))
-    Track(SearchBox.FocusLost:Connect(function()
-        TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(12, 14, 19)}):Play()
-    end))
 
-    -- LOCK BUTTON
     local isLocked = false
     local LockBtn = Instance.new("TextButton")
     LockBtn.Size = UDim2.new(0, 34, 0, 34); LockBtn.Position = UDim2.new(1, -186, 0, 6)
-    LockBtn.BackgroundTransparency = 1
-    LockBtn.Text = "🔓"
-    LockBtn.TextColor3 = Color3.fromRGB(180, 185, 200)
-    LockBtn.TextSize = 16; LockBtn.Font = Enum.Font.GothamBold
-    LockBtn.Parent = Topbar
-    LockBtn:SetAttribute("SearchText", "lock khóa gui")
+    LockBtn.BackgroundTransparency = 1; LockBtn.Text = "🔓"
+    LockBtn.TextColor3 = Color3.fromRGB(180, 185, 200); LockBtn.TextSize = 16
+    LockBtn.Font = Enum.Font.GothamBold; LockBtn.Parent = Topbar
 
     Track(LockBtn.MouseButton1Click:Connect(function()
         isLocked = not isLocked
         LockBtn.Text = isLocked and "🔒" or "🔓"
         LockBtn.TextColor3 = isLocked and themeColor or Color3.fromRGB(180, 185, 200)
-        TweenService:Create(LockBtn, TweenInfo.new(0.15, Enum.EasingStyle.Back), {Size = UDim2.new(0, 40, 0, 40)}):Play()
-        task.wait(0.15)
-        TweenService:Create(LockBtn, TweenInfo.new(0.15, Enum.EasingStyle.Back), {Size = UDim2.new(0, 34, 0, 34)}):Play()
         Window:Notify({
             Title = isLocked and "🔒 Đã Khóa" or "🔓 Đã Mở",
             Text = isLocked and "GUI sẽ không kéo được nữa." or "Có thể kéo GUI bình thường.",
@@ -523,28 +497,24 @@ function AlatferaLib.CreateWindow(config)
         })
     end))
 
-    -- Minimize
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Size = UDim2.new(0, 34, 0, 34); MinimizeBtn.Position = UDim2.new(1, -78, 0, 6)
     MinimizeBtn.BackgroundTransparency = 1; MinimizeBtn.Text = "↑"
     MinimizeBtn.TextColor3 = Color3.fromRGB(180, 185, 200); MinimizeBtn.TextSize = 18
     MinimizeBtn.Font = Enum.Font.GothamBold; MinimizeBtn.Parent = Topbar
 
-    -- Help
     local HelpBtn = Instance.new("TextButton")
     HelpBtn.Size = UDim2.new(0, 34, 0, 34); HelpBtn.Position = UDim2.new(1, -114, 0, 6)
     HelpBtn.BackgroundTransparency = 1; HelpBtn.Text = "?"
     HelpBtn.TextColor3 = Color3.fromRGB(180, 185, 200); HelpBtn.TextSize = 17
     HelpBtn.Font = Enum.Font.GothamBold; HelpBtn.Parent = Topbar
 
-    -- Keybind info
     local KeybindBtn = Instance.new("TextButton")
     KeybindBtn.Size = UDim2.new(0, 34, 0, 34); KeybindBtn.Position = UDim2.new(1, -150, 0, 6)
     KeybindBtn.BackgroundTransparency = 1; KeybindBtn.Text = "⌨"
     KeybindBtn.TextColor3 = Color3.fromRGB(180, 185, 200); KeybindBtn.TextSize = 17
     KeybindBtn.Font = Enum.Font.GothamBold; KeybindBtn.Parent = Topbar
 
-    -- Open button
     local OpenBtnFrame = Instance.new("TextButton")
     OpenBtnFrame.Size = UDim2.new(0, 120, 0, 32); OpenBtnFrame.Position = UDim2.new(0.5, -60, 0, 8)
     OpenBtnFrame.BackgroundColor3 = Color3.fromRGB(22, 25, 34); OpenBtnFrame.BackgroundTransparency = 0.35
@@ -566,7 +536,6 @@ function AlatferaLib.CreateWindow(config)
         end
     end)
 
-    -- ✅ FIX: Nút Close - Lưu và tắt Blur/Particle
     Track(CloseBtn.MouseButton1Click:Connect(function()
         savedBlurState = Window:IsBlurEnabled()
         savedParticleState = Window:IsParticlesEnabled()
@@ -579,7 +548,6 @@ function AlatferaLib.CreateWindow(config)
         OpenBtnFrame.Visible = true
     end))
 
-    -- ✅ FIX: Nút Open - Khôi phục Blur/Particle
     Track(OpenBtnFrame.MouseButton1Click:Connect(function()
         MainFrame.Visible = true
         OpenBtnFrame.Visible = false
@@ -613,7 +581,6 @@ function AlatferaLib.CreateWindow(config)
         Window:Notify({ Title = "Phím Tắt", Text = "Ẩn/hiện GUI: " .. tostring(currentToggleKey.Name), Duration = 4 })
     end))
 
-    -- ✅ FIX: Phím tắt RightControl - Lưu và tắt Blur/Particle
     Track(UserInputService.InputBegan:Connect(function(input, gpe)
         if not gpe and input.KeyCode == currentToggleKey then
             if MainFrame.Visible then
@@ -632,7 +599,6 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- Drag
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
         if isLocked then return end
@@ -651,7 +617,7 @@ function AlatferaLib.CreateWindow(config)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
     end))
 
-    -- ============ SIDEBAR ============
+    -- SIDEBAR
     local Sidebar = Instance.new("ScrollingFrame")
     Sidebar.Size = UDim2.new(0, 160, 1, showPlaytime and -86 or -58)
     Sidebar.Position = UDim2.new(0, 10, 0, 54)
@@ -731,7 +697,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- ============ NOTIFY ============
+    -- NOTIFY
     local NotifContainer = Instance.new("Frame")
     NotifContainer.Size = UDim2.new(0, 250, 1, -20)
     NotifContainer.Position = UDim2.new(1, -260, 0, 10)
@@ -798,7 +764,7 @@ function AlatferaLib.CreateWindow(config)
         end)
     end
 
-    -- ============ TOOLTIP ============
+    -- TOOLTIP
     local TooltipFrame = Instance.new("Frame")
     TooltipFrame.Size = UDim2.new(0, 200, 0, 28)
     TooltipFrame.BackgroundColor3 = Color3.fromRGB(30, 34, 46)
@@ -807,9 +773,6 @@ function AlatferaLib.CreateWindow(config)
     TooltipFrame.ZIndex = 100
     TooltipFrame.Parent = ScreenGui
     local TTC = Instance.new("UICorner"); TTC.CornerRadius = UDim.new(0, 6); TTC.Parent = TooltipFrame
-    if enableStroke then
-        local TTS = Instance.new("UIStroke"); TTS.Color = themeColor; TTS.Thickness = 1; TTS.Parent = TooltipFrame
-    end
     local TooltipLabel = Instance.new("TextLabel")
     TooltipLabel.Size = UDim2.new(1, -12, 1, 0); TooltipLabel.Position = UDim2.new(0, 6, 0, 0)
     TooltipLabel.BackgroundTransparency = 1
@@ -831,7 +794,7 @@ function AlatferaLib.CreateWindow(config)
         end))
     end
 
-    -- ============ PRESET METHODS ============
+    -- PRESET
     function Window:SavePreset(name)
         if not name or name == "" then return false end
         if not savedData["_Presets"] then savedData["_Presets"] = {} end
@@ -870,7 +833,7 @@ function AlatferaLib.CreateWindow(config)
         return false
     end
 
-    -- ============ CREATE TAB ============
+    -- CREATE TAB
     function Window:CreateTab(tabName, iconEmoji)
         local Tab = {}
         local displayText = iconEmoji and (iconEmoji .. "  " .. tabName) or ("  " .. tabName)
@@ -939,7 +902,6 @@ function AlatferaLib.CreateWindow(config)
 
         FirstTab = false
 
-        -- ===== WIDGET: LABEL =====
         function Tab:CreateLabel(text)
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(1, -10, 0, 28)
@@ -958,7 +920,6 @@ function AlatferaLib.CreateWindow(config)
             return Label
         end
 
-        -- ===== WIDGET: PARAGRAPH =====
         function Tab:CreateParagraph(text)
             local Wrap = Instance.new("Frame")
             Wrap.Size = UDim2.new(1, -10, 0, 0)
@@ -990,7 +951,6 @@ function AlatferaLib.CreateWindow(config)
             return Wrap
         end
 
-        -- ===== WIDGET: DIVIDER =====
         function Tab:CreateDivider()
             local Div = Instance.new("Frame")
             Div.Size = UDim2.new(1, -20, 0, 1)
@@ -1001,7 +961,6 @@ function AlatferaLib.CreateWindow(config)
             return Div
         end
 
-        -- ===== WIDGET: SECTION =====
         function Tab:CreateSection(text)
             local SectionFrame = Instance.new("Frame")
             SectionFrame.Size = UDim2.new(1, -10, 0, 24)
@@ -1020,7 +979,6 @@ function AlatferaLib.CreateWindow(config)
             SectionFrame:SetAttribute("SearchText", string.lower(text or ""))
         end
 
-        -- ===== WIDGET: BUTTON =====
         function Tab:CreateButton(btnText, callback)
             callback = callback or function() end
             local Button = Instance.new("TextButton")
@@ -1046,7 +1004,6 @@ function AlatferaLib.CreateWindow(config)
             return Button
         end
 
-        -- ===== WIDGET: TOGGLE =====
         function Tab:CreateToggle(toggleText, flagName, defaultState, callback)
             callback = callback or function() end
             if flagName and savedData[flagName] ~= nil then defaultState = savedData[flagName] end
@@ -1114,12 +1071,15 @@ function AlatferaLib.CreateWindow(config)
             return ToggleFrame
         end
 
-        -- ===== WIDGET: SLIDER =====
-        function Tab:CreateSlider(sliderText, flagName, minVal, maxVal, defaultVal, callback)
+        -- ═══════════════════════════════════════════
+        -- SLIDER CÓ Ô NHẬP SỐ (V12.2)
+        -- ═══════════════════════════════════════════
+        function Tab:CreateSlider(sliderText, flagName, minVal, maxVal, defaultVal, callback, showInput)
             callback = callback or function() end
             minVal = minVal or 0; maxVal = maxVal or 1000
             if flagName and savedData[flagName] ~= nil then defaultVal = savedData[flagName] end
             defaultVal = math.clamp(defaultVal or minVal, minVal, maxVal)
+            showInput = showInput or false  -- Mặc định tắt để tương thích code cũ
 
             local SliderFrame = Instance.new("Frame")
             SliderFrame.Size = UDim2.new(1, -10, 0, 48)
@@ -1132,19 +1092,34 @@ function AlatferaLib.CreateWindow(config)
             SliderFrame:SetAttribute("SearchText", string.lower(sliderText))
 
             local Label = Instance.new("TextLabel")
-            Label.Size = UDim2.new(1, -60, 0, 22); Label.Position = UDim2.new(0, 14, 0, 3)
+            Label.Size = UDim2.new(1, -80, 0, 22); Label.Position = UDim2.new(0, 14, 0, 3)
             Label.BackgroundTransparency = 1; Label.Text = sliderText
             Label.TextColor3 = Color3.fromRGB(240, 240, 245)
             Label.TextXAlignment = Enum.TextXAlignment.Left
             Label.Font = Enum.Font.Gotham; Label.TextSize = 13
             Label.Parent = SliderFrame
 
-            local ValueLabel = Instance.new("TextLabel")
-            ValueLabel.Size = UDim2.new(0, 50, 0, 22); ValueLabel.Position = UDim2.new(1, -60, 0, 3)
-            ValueLabel.BackgroundTransparency = 1; ValueLabel.Text = tostring(defaultVal)
-            ValueLabel.TextColor3 = themeColor
-            ValueLabel.Font = Enum.Font.GothamBold; ValueLabel.TextSize = 13
-            ValueLabel.Parent = SliderFrame
+            -- Ô hiển thị / nhập giá trị
+            local ValueBox = Instance.new("TextBox")
+            ValueBox.Size = UDim2.new(0, 60, 0, 22); ValueBox.Position = UDim2.new(1, -68, 0, 3)
+            ValueBox.BackgroundColor3 = showInput and Color3.fromRGB(15, 17, 23) or Color3.fromRGB(24, 28, 38)
+            ValueBox.BackgroundTransparency = showInput and 0 or 1
+            ValueBox.Text = tostring(defaultVal)
+            ValueBox.TextColor3 = themeColor
+            ValueBox.Font = Enum.Font.GothamBold; ValueBox.TextSize = 12
+            ValueBox.TextEditable = showInput
+            ValueBox.ClearTextOnFocus = false
+            ValueBox.PlaceholderText = "..."
+            ValueBox.Parent = SliderFrame
+            local VBC = Instance.new("UICorner"); VBC.CornerRadius = UDim.new(0, 6); VBC.Parent = ValueBox
+
+            local ValueStroke = nil
+            if showInput and enableStroke then
+                ValueStroke = Instance.new("UIStroke")
+                ValueStroke.Color = strokeColor
+                ValueStroke.Thickness = 1
+                ValueStroke.Parent = ValueBox
+            end
 
             local SliderBar = Instance.new("TextButton")
             SliderBar.Size = UDim2.new(1, -28, 0, 7); SliderBar.Position = UDim2.new(0, 14, 0, 30)
@@ -1170,14 +1145,20 @@ function AlatferaLib.CreateWindow(config)
             local ThumbStroke = Instance.new("UIStroke")
             ThumbStroke.Color = themeColor; ThumbStroke.Thickness = 2; ThumbStroke.Parent = Thumb
 
+            local currentValue = defaultVal
             local sliding = false
+            local isInputVisible = showInput
+
+            -- Hàm cập nhật slider visual (không trigger callback)
             local function applyValue(val)
+                currentValue = val
                 local percent = (val - minVal) / (maxVal - minVal)
                 FillBar.Size = UDim2.new(percent, 0, 1, 0)
                 Thumb.Position = UDim2.new(percent, -8, 0.5, -8)
-                ValueLabel.Text = tostring(val)
+                ValueBox.Text = tostring(val)
             end
 
+            -- Kéo slider
             local function updateSlider(input)
                 local percent = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
                 local val = math.floor(minVal + (maxVal - minVal) * percent)
@@ -1204,6 +1185,41 @@ function AlatferaLib.CreateWindow(config)
                 end
             end))
 
+            -- Xử lý khi user gõ số vào ô nhập
+            local function commitInput()
+                local txt = ValueBox.Text
+                local num = tonumber(txt)
+                if num == nil then
+                    -- Không phải số → reset về giá trị cũ
+                    ValueBox.Text = tostring(currentValue)
+                    return
+                end
+                -- Clamp giữa min và max
+                num = math.floor(num)
+                if num < minVal then num = minVal end
+                if num > maxVal then num = maxVal end
+                applyValue(num)
+                if flagName then savedData[flagName] = num; SaveCurrentConfig() end
+                callback(num)
+            end
+
+            Track(ValueBox.Focused:Connect(function()
+                if isInputVisible and enableStroke then
+                    TweenService:Create(ValueBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(22, 26, 36)}):Play()
+                    if ValueStroke then ValueStroke.Color = themeColor end
+                end
+            end))
+            Track(ValueBox.FocusLost:Connect(function(enterPressed)
+                if isInputVisible then
+                    commitInput()
+                    if enableStroke then
+                        TweenService:Create(ValueBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(15, 17, 23)}):Play()
+                        if ValueStroke then ValueStroke.Color = strokeColor end
+                    end
+                end
+            end))
+
+            -- Lưu applier cho preset
             if flagName then
                 table.insert(presetAppliers, function()
                     if savedData[flagName] ~= nil then
@@ -1212,9 +1228,45 @@ function AlatferaLib.CreateWindow(config)
                     end
                 end)
             end
+
+            -- Object trả về cho phép điều khiển slider
+            local sliderObj = {}
+            function sliderObj:Set(val)
+                val = math.clamp(math.floor(val), minVal, maxVal)
+                applyValue(val)
+                if flagName then savedData[flagName] = val; SaveCurrentConfig() end
+                callback(val)
+            end
+            function sliderObj:Get()
+                return currentValue
+            end
+            function sliderObj:SetInputVisible(bool)
+                isInputVisible = bool and true or false
+                ValueBox.TextEditable = isInputVisible
+                ValueBox.BackgroundTransparency = isInputVisible and 0 or 1
+                if isInputVisible then
+                    ValueBox.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
+                    if not ValueStroke and enableStroke then
+                        ValueStroke = Instance.new("UIStroke")
+                        ValueStroke.Color = strokeColor
+                        ValueStroke.Thickness = 1
+                        ValueStroke.Parent = ValueBox
+                    elseif ValueStroke then
+                        ValueStroke.Enabled = true
+                    end
+                else
+                    if ValueStroke then ValueStroke.Enabled = false end
+                end
+            end
+            function sliderObj:IsInputVisible()
+                return isInputVisible
+            end
+            function sliderObj:GetMin() return minVal end
+            function sliderObj:GetMax() return maxVal end
+
+            return sliderObj
         end
 
-        -- ===== WIDGET: DROPDOWN =====
         function Tab:CreateDropdown(dropText, options, defaultOption, callback)
             callback = callback or function() end
             options = options or {}
@@ -1300,7 +1352,6 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
-        -- ===== WIDGET: TEXTBOX =====
         function Tab:CreateTextbox(boxText, flagName, maxChars, callback)
             callback = callback or function() end
             local defaultVal = ""
@@ -1360,7 +1411,6 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
-        -- ===== WIDGET: KEYBIND =====
         function Tab:CreateKeybind(labelText, flagName, defaultKey, callback)
             callback = callback or function() end
             local currentKey = defaultKey or Enum.KeyCode.Unknown
@@ -1438,7 +1488,6 @@ function AlatferaLib.CreateWindow(config)
             }
         end
 
-        -- ===== WIDGET: PROGRESS BAR =====
         function Tab:CreateProgressBar(labelText, initialPercent)
             local percent = math.clamp(initialPercent or 0, 0, 100)
 
@@ -1490,7 +1539,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- ===== WIDGET: IMAGE =====
         function Tab:CreateImage(imageId, height)
             if not imageId then return nil end
             local h = height or 100
@@ -1521,7 +1569,6 @@ function AlatferaLib.CreateWindow(config)
         return Tab
     end
 
-    -- ============ BẬT/TẮT VISUAL EFFECTS ============
     function Window:SetBlur(enabled)
         if enabled then
             if not blurEffect or not blurEffect.Parent then
@@ -1563,7 +1610,6 @@ function AlatferaLib.CreateWindow(config)
         return particleContainer ~= nil and particleContainer.Parent ~= nil
     end
 
-    -- ============ DESTROY ============
     function Window:Destroy()
         TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
         task.wait(0.3)
