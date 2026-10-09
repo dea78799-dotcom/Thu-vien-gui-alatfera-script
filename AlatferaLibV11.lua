@@ -326,8 +326,8 @@ function AlatferaLib.CreateWindow(config)
     Window.ThemeColor = themeColor
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0.75, 0, 0.8, 0)
-    MainFrame.Position = UDim2.new(0.125, 0, 0.1, 0)
+    MainFrame.Size = UDim2.new(0.70, 0, 0.88, 0)
+    MainFrame.Position = UDim2.new(0.15, 0, 0.06, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
@@ -415,7 +415,7 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(12, 14, 19)}):Play()
     end))
 
-    -- === LOCK BUTTON (MỚI V11) ===
+    -- === LOCK BUTTON ===
     local isLocked = false
     local LockBtn = Instance.new("TextButton")
     LockBtn.Size = UDim2.new(0, 34, 0, 34); LockBtn.Position = UDim2.new(1, -186, 0, 6)
@@ -503,10 +503,10 @@ function AlatferaLib.CreateWindow(config)
         isMinimized = not isMinimized
         if isMinimized then
             MinimizeBtn.Text = "↓"
-            MainFrame:TweenSize(UDim2.new(0.75, 0, 0, 46), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
+            MainFrame:TweenSize(UDim2.new(0.70, 0, 0, 46), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
         else
             MinimizeBtn.Text = "↑"
-            MainFrame:TweenSize(UDim2.new(0.75, 0, 0.8, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
+            MainFrame:TweenSize(UDim2.new(0.70, 0, 0.88, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
         end
     end))
 
@@ -529,7 +529,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- Drag (tôn trọng isLocked)
+    -- Drag
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
         if isLocked then return end
@@ -728,7 +728,7 @@ function AlatferaLib.CreateWindow(config)
         end))
     end
 
-    -- ============ PRESET METHODS (MỚI V11) ============
+    -- ============ PRESET METHODS ============
     function Window:SavePreset(name)
         if not name or name == "" then return false end
         if not savedData["_Presets"] then savedData["_Presets"] = {} end
@@ -855,7 +855,7 @@ function AlatferaLib.CreateWindow(config)
             return Label
         end
 
-        -- ===== WIDGET: PARAGRAPH (MỚI V11) =====
+        -- ===== WIDGET: PARAGRAPH =====
         function Tab:CreateParagraph(text)
             local Wrap = Instance.new("Frame")
             Wrap.Size = UDim2.new(1, -10, 0, 0)
@@ -887,7 +887,7 @@ function AlatferaLib.CreateWindow(config)
             return Wrap
         end
 
-        -- ===== WIDGET: DIVIDER (MỚI V11) =====
+        -- ===== WIDGET: DIVIDER =====
         function Tab:CreateDivider()
             local Div = Instance.new("Frame")
             Div.Size = UDim2.new(1, -20, 0, 1)
@@ -1257,7 +1257,7 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
-        -- ===== WIDGET: KEYBIND (MỚI V11) =====
+        -- ===== WIDGET: KEYBIND =====
         function Tab:CreateKeybind(labelText, flagName, defaultKey, callback)
             callback = callback or function() end
             local currentKey = defaultKey or Enum.KeyCode.Unknown
@@ -1335,7 +1335,7 @@ function AlatferaLib.CreateWindow(config)
             }
         end
 
-        -- ===== WIDGET: PROGRESS BAR (MỚI V11) =====
+        -- ===== WIDGET: PROGRESS BAR =====
         function Tab:CreateProgressBar(labelText, initialPercent)
             local percent = math.clamp(initialPercent or 0, 0, 100)
 
@@ -1387,7 +1387,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- ===== WIDGET: IMAGE (MỚI V11 - TÙY CHỌN) =====
+        -- ===== WIDGET: IMAGE =====
         function Tab:CreateImage(imageId, height)
             if not imageId then return nil end
             local h = height or 100
