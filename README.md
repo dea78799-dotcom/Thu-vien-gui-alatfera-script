@@ -1,3 +1,12 @@
+--[[
+    ============================================
+    ALATFERA LIB V11 - UI EDITION
+    Thêm: Lock GUI, Save/Load Preset,
+          Keybind, Paragraph, Divider,
+          ProgressBar, Image, Tooltip
+    API 100% tương thích V10
+    ============================================
+]]
 
 local AlatferaLib = {}
 AlatferaLib.__index = AlatferaLib
@@ -14,14 +23,14 @@ local Stats = game:GetService("Stats")
 local ParentContainer = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
 local ColorPresets = {
-    blue    = Color3.fromRGB(0, 170, 255),    red     = Color3.fromRGB(245, 65, 85),
-    green   = Color3.fromRGB(45, 200, 110),   purple  = Color3.fromRGB(160, 90, 245),
-    orange  = Color3.fromRGB(255, 130, 40),   yellow  = Color3.fromRGB(250, 200, 40),
-    cyan    = Color3.fromRGB(0, 220, 220),    pink    = Color3.fromRGB(255, 110, 180),
-    rose    = Color3.fromRGB(240, 50, 100),   emerald = Color3.fromRGB(16, 185, 129),
-    indigo  = Color3.fromRGB(99, 102, 241),   violet  = Color3.fromRGB(139, 92, 246),
-    amber   = Color3.fromRGB(245, 158, 11),   teal    = Color3.fromRGB(20, 184, 166),
-    neon    = Color3.fromRGB(57, 255, 20),    dark    = Color3.fromRGB(15, 17, 23)
+    blue    = Color3.fromRGB(0, 170, 255),   red     = Color3.fromRGB(245, 65, 85),
+    green   = Color3.fromRGB(45, 200, 110),  purple  = Color3.fromRGB(160, 90, 245),
+    orange  = Color3.fromRGB(255, 130, 40),  yellow  = Color3.fromRGB(250, 200, 40),
+    cyan    = Color3.fromRGB(0, 220, 220),   pink    = Color3.fromRGB(255, 110, 180),
+    rose    = Color3.fromRGB(240, 50, 100),  emerald = Color3.fromRGB(16, 185, 129),
+    indigo  = Color3.fromRGB(99, 102, 241),  violet  = Color3.fromRGB(139, 92, 246),
+    amber   = Color3.fromRGB(245, 158, 11),  teal    = Color3.fromRGB(20, 184, 166),
+    neon    = Color3.fromRGB(57, 255, 20),   dark    = Color3.fromRGB(15, 17, 23),
 }
 
 local function ParseColor(val, default)
@@ -39,14 +48,10 @@ local function CopyToClipboard(st)
     elseif Syn and Syn.set_thread_identity then setclipboard(st) end
 end
 
--- ============================================================
--- HIỆU ỨNG: RIPPLE (Material Design)
--- ============================================================
 local function CreateRipple(button, input)
     button.ClipsDescendants = true
     local xPos = input.Position.X - button.AbsolutePosition.X
     local yPos = input.Position.Y - button.AbsolutePosition.Y
-
     local ripple = Instance.new("Frame")
     ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     ripple.BackgroundTransparency = 0.75
@@ -55,32 +60,22 @@ local function CreateRipple(button, input)
     ripple.Size = UDim2.new(0, 0, 0, 0)
     ripple.ZIndex = 5
     ripple.Parent = button
-
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(1, 0); c.Parent = ripple
-
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(1, 0); c.Parent = ripple
     local maxSize = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 2.5
     local tween = TweenService:Create(ripple, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Size = UDim2.new(0, maxSize, 0, maxSize),
         Position = UDim2.new(0, xPos - maxSize/2, 0, yPos - maxSize/2),
-        BackgroundTransparency = 1
+        BackgroundTransparency = 1,
     })
     tween:Play()
     tween.Completed:Connect(function() ripple:Destroy() end)
 end
 
--- ============================================================
--- HIỆU ỨNG: HOVER + PRESS SCALE cho Button
--- ============================================================
 local function AttachButtonEffects(button, trackFn, hoverColor)
-    local scale = Instance.new("UIScale")
-    scale.Scale = 1; scale.Parent = button
-
+    local scale = Instance.new("UIScale"); scale.Scale = 1; scale.Parent = button
     trackFn(button.MouseEnter:Connect(function()
         TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Quart), {Scale = 1.02}):Play()
-        if hoverColor then
-            TweenService:Create(button, TweenInfo.new(0.18), {BackgroundColor3 = hoverColor}):Play()
-        end
+        if hoverColor then TweenService:Create(button, TweenInfo.new(0.18), {BackgroundColor3 = hoverColor}):Play() end
     end))
     trackFn(button.MouseLeave:Connect(function()
         TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Quart), {Scale = 1}):Play()
@@ -93,13 +88,10 @@ local function AttachButtonEffects(button, trackFn, hoverColor)
     end))
 end
 
--- ============================================================
--- HÀM CHÍNH
--- ============================================================
 function AlatferaLib.CreateWindow(config)
     config = config or {}
     local hubTitle       = config.Title or "Alatfera Script"
-    local hubVersion     = config.Version or "v10.0"
+    local hubVersion     = config.Version or "v11.0"
     local showPlaytime   = (config.ShowPlaytime == nil) and true or config.ShowPlaytime
     local scriptNameText = config.LoadingScriptName or "Alatfera Script"
     local statusText     = config.LoadingStatus or "Đang tải giao diện..."
@@ -134,28 +126,22 @@ function AlatferaLib.CreateWindow(config)
 
     local connections = {}
     local function Track(c) table.insert(connections, c); return c end
+    local presetAppliers = {}
 
-    -- ========================================================
-    -- 0. KEY SYSTEM (có Pop-in)
-    -- ========================================================
+    -- ============ KEY SYSTEM ============
     if useKeySystem then
         local keyPassed = (savedData["_SavedKey"] == correctKey)
-
         if not keyPassed then
             local KeyFrame = Instance.new("Frame")
-            KeyFrame.Name = "KeyFrame"
             KeyFrame.Size = UDim2.new(0, 360, 0, 220)
             KeyFrame.Position = UDim2.new(0.5, -180, 0.5, -110)
             KeyFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
             KeyFrame.BorderSizePixel = 0
             KeyFrame.Parent = ScreenGui
-
             local KC = Instance.new("UICorner"); KC.CornerRadius = UDim.new(0, cornerRadius); KC.Parent = KeyFrame
             if enableStroke then
                 local KS = Instance.new("UIStroke"); KS.Color = strokeColor; KS.Thickness = 1.5; KS.Parent = KeyFrame
             end
-
-            -- Pop-in
             local kScale = Instance.new("UIScale"); kScale.Scale = 0.85; kScale.Parent = KeyFrame
             TweenService:Create(kScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
@@ -212,7 +198,6 @@ function AlatferaLib.CreateWindow(config)
                 DiscordBtn.Text = "📋 Copy Discord"
             end))
 
-            -- Drag
             local dragK, startK, posK
             Track(KeyFrame.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -235,26 +220,23 @@ function AlatferaLib.CreateWindow(config)
                     StatusLabel.TextColor3 = Color3.fromRGB(45, 200, 110)
                     savedData["_SavedKey"] = correctKey
                     SaveCurrentConfig()
-                    -- Đóng với animation
                     TweenService:Create(kScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
                     task.wait(0.3)
                     KeyFrame:Destroy()
                     keyPassed = true
                 else
                     remainingAttempts = remainingAttempts - 1
-                    -- Shake animation
                     local origPos = KeyFrame.Position
                     for i = 1, 4 do
                         KeyFrame.Position = origPos + UDim2.new(0, (i % 2 == 0 and 8 or -8), 0, 0)
                         task.wait(0.04)
                     end
                     KeyFrame.Position = origPos
-                    
                     if remainingAttempts <= 0 then
                         StatusLabel.Text = "❌ Sai quá " .. maxAttempts .. " lần!"
                         StatusLabel.TextColor3 = Color3.fromRGB(245, 65, 85)
                         task.wait(1)
-                        LocalPlayer:Kick("Alatfera Security: Nhập sai Key quá " .. maxAttempts .. " lần!")
+                        LocalPlayer:Kick("Alatfera Security: Sai Key quá " .. maxAttempts .. " lần!")
                     else
                         StatusLabel.Text = "❌ Sai Key! Còn " .. remainingAttempts .. "/" .. maxAttempts .. " lần"
                         StatusLabel.TextColor3 = Color3.fromRGB(245, 65, 85)
@@ -274,11 +256,8 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
-    -- ========================================================
-    -- 1. LOADING SCREEN (Radar Pulse)
-    -- ========================================================
+    -- ============ LOADING ============
     local LoadingFrame = Instance.new("Frame")
-    LoadingFrame.Name = "LoadingFrame"
     LoadingFrame.Size = UDim2.new(0, 280, 0, 110)
     LoadingFrame.Position = UDim2.new(0.5, -140, 0.5, -55)
     LoadingFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
@@ -288,7 +267,6 @@ function AlatferaLib.CreateWindow(config)
     if enableStroke then
         local LS = Instance.new("UIStroke"); LS.Color = strokeColor; LS.Thickness = 1.5; LS.Parent = LoadingFrame
     end
-
     local lScale = Instance.new("UIScale"); lScale.Scale = 0.85; lScale.Parent = LoadingFrame
     TweenService:Create(lScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
@@ -317,13 +295,7 @@ function AlatferaLib.CreateWindow(config)
 
     TweenService:Create(BarFill, TweenInfo.new(1.0, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
 
-    -- Radar pulse rings
-    local radarConn = Track(RunService.Heartbeat:Connect(function()
-        -- spawn ring mỗi ~0.7s
-    end))
-
     task.spawn(function()
-        local radarCenter = UDim2.new(0.5, 0, 1, -18)
         while LoadingFrame.Parent do
             local ring = Instance.new("Frame")
             ring.Size = UDim2.new(0, 8, 0, 8)
@@ -332,13 +304,12 @@ function AlatferaLib.CreateWindow(config)
             ring.Parent = LoadingFrame
             local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(1, 0); rc.Parent = ring
             local rs = Instance.new("UIStroke"); rs.Color = themeColor; rs.Thickness = 2; rs.Parent = ring
-
             TweenService:Create(ring, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = UDim2.new(0, 50, 0, 50),
-                Position = UDim2.new(0.5, -25, 1, -43)
+                Position = UDim2.new(0.5, -25, 1, -43),
             }):Play()
             TweenService:Create(rs, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Transparency = 1, Thickness = 0.5
+                Transparency = 1, Thickness = 0.5,
             }):Play()
             task.wait(1.2)
             ring:Destroy()
@@ -346,19 +317,15 @@ function AlatferaLib.CreateWindow(config)
     end)
 
     task.wait(1.2)
-    if radarConn then radarConn:Disconnect() end
     TweenService:Create(lScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
     task.wait(0.25)
     LoadingFrame:Destroy()
 
-    -- ========================================================
-    -- 2. MAIN WINDOW
-    -- ========================================================
+    -- ============ MAIN WINDOW ============
     local Window = {}
     Window.ThemeColor = themeColor
 
     local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0.75, 0, 0.8, 0)
     MainFrame.Position = UDim2.new(0.125, 0, 0.1, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
@@ -369,34 +336,28 @@ function AlatferaLib.CreateWindow(config)
     if enableStroke then
         local MS = Instance.new("UIStroke"); MS.Color = strokeColor; MS.Thickness = 2; MS.Parent = MainFrame
     end
-
-    -- Pop-in Animation
     local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
     TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
-    -- TOPBAR
+    -- Topbar
     local Topbar = Instance.new("Frame")
-    Topbar.Name = "Topbar"; Topbar.Size = UDim2.new(1, 0, 0, 46)
+    Topbar.Size = UDim2.new(1, 0, 0, 46)
     Topbar.BackgroundColor3 = Color3.fromRGB(20, 23, 32); Topbar.BorderSizePixel = 0
     Topbar.Parent = MainFrame
     local TC = Instance.new("UICorner"); TC.CornerRadius = UDim.new(0, cornerRadius); TC.Parent = Topbar
 
-    -- Topbar gradient shimmer
     local topGradient = Instance.new("UIGradient")
     topGradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 23, 32)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 34, 48)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 23, 32))
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 23, 32)),
     })
     topGradient.Parent = Topbar
-
     Track(RunService.RenderStepped:Connect(function()
-        local t = tick() * 0.25
-        topGradient.Offset = Vector2.new(math.sin(t) * 0.4, 0)
+        topGradient.Offset = Vector2.new(math.sin(tick() * 0.25) * 0.4, 0)
     end))
 
     local hexString = string.format("#%02X%02X%02X", themeColor.R*255, themeColor.G*255, themeColor.B*255)
-
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Size = UDim2.new(0.28, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 18, 0, 0)
     TitleLabel.BackgroundTransparency = 1
@@ -421,26 +382,22 @@ function AlatferaLib.CreateWindow(config)
         local currentTime = tick()
         if currentTime - lastTime >= 1 then
             local fps = math.floor(frameCount / (currentTime - lastTime))
-            local ok, ping = pcall(function()
-                return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
-            end)
+            local ok, ping = pcall(function() return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
             StatsLabel.Text = string.format("⚡ %d FPS | %d ms", fps, ok and ping or 0)
             frameCount = 0; lastTime = currentTime
         end
     end))
 
-    -- Close button
+    -- Close
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Size = UDim2.new(0, 34, 0, 34); CloseBtn.Position = UDim2.new(1, -42, 0, 6)
     CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "✕"
-    CloseBtn.TextColor3 = Color3.fromRGB(245, 70, 90)
-    CloseBtn.TextSize = 17; CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.Parent = Topbar
+    CloseBtn.TextColor3 = Color3.fromRGB(245, 70, 90); CloseBtn.TextSize = 17
+    CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.Parent = Topbar
 
-    -- Search box
+    -- Search
     local SearchBox = Instance.new("TextBox")
-    SearchBox.Name = "SearchBox"
-    SearchBox.Size = UDim2.new(0, 160, 0, 28); SearchBox.Position = UDim2.new(1, -305, 0, 9)
+    SearchBox.Size = UDim2.new(0, 160, 0, 28); SearchBox.Position = UDim2.new(1, -350, 0, 9)
     SearchBox.BackgroundColor3 = Color3.fromRGB(12, 14, 19); SearchBox.Text = ""
     SearchBox.PlaceholderText = "🔍 Tìm kiếm..."
     SearchBox.TextColor3 = Color3.fromRGB(240, 240, 245)
@@ -451,8 +408,6 @@ function AlatferaLib.CreateWindow(config)
     if enableStroke then
         local SrS = Instance.new("UIStroke"); SrS.Color = strokeColor; SrS.Thickness = 1; SrS.Parent = SearchBox
     end
-
-    -- Search box glow on focus
     Track(SearchBox.Focused:Connect(function()
         TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 24, 34)}):Play()
     end))
@@ -460,19 +415,47 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(12, 14, 19)}):Play()
     end))
 
-    -- Topbar buttons
+    -- === LOCK BUTTON (MỚI V11) ===
+    local isLocked = false
+    local LockBtn = Instance.new("TextButton")
+    LockBtn.Size = UDim2.new(0, 34, 0, 34); LockBtn.Position = UDim2.new(1, -186, 0, 6)
+    LockBtn.BackgroundTransparency = 1
+    LockBtn.Text = "🔓"
+    LockBtn.TextColor3 = Color3.fromRGB(180, 185, 200)
+    LockBtn.TextSize = 16; LockBtn.Font = Enum.Font.GothamBold
+    LockBtn.Parent = Topbar
+    LockBtn:SetAttribute("SearchText", "lock khóa gui")
+
+    Track(LockBtn.MouseButton1Click:Connect(function()
+        isLocked = not isLocked
+        LockBtn.Text = isLocked and "🔒" or "🔓"
+        LockBtn.TextColor3 = isLocked and themeColor or Color3.fromRGB(180, 185, 200)
+        TweenService:Create(LockBtn, TweenInfo.new(0.15, Enum.EasingStyle.Back), {Size = UDim2.new(0, 40, 0, 40)}):Play()
+        task.wait(0.15)
+        TweenService:Create(LockBtn, TweenInfo.new(0.15, Enum.EasingStyle.Back), {Size = UDim2.new(0, 34, 0, 34)}):Play()
+        Window:Notify({
+            Title = isLocked and "🔒 Đã Khóa" or "🔓 Đã Mở",
+            Text = isLocked and "GUI sẽ không kéo được nữa." or "Có thể kéo GUI bình thường.",
+            Duration = 1.5,
+            Color = isLocked and "red" or "green",
+        })
+    end))
+
+    -- Minimize
     local MinimizeBtn = Instance.new("TextButton")
     MinimizeBtn.Size = UDim2.new(0, 34, 0, 34); MinimizeBtn.Position = UDim2.new(1, -78, 0, 6)
     MinimizeBtn.BackgroundTransparency = 1; MinimizeBtn.Text = "↑"
     MinimizeBtn.TextColor3 = Color3.fromRGB(180, 185, 200); MinimizeBtn.TextSize = 18
     MinimizeBtn.Font = Enum.Font.GothamBold; MinimizeBtn.Parent = Topbar
 
+    -- Help
     local HelpBtn = Instance.new("TextButton")
     HelpBtn.Size = UDim2.new(0, 34, 0, 34); HelpBtn.Position = UDim2.new(1, -114, 0, 6)
     HelpBtn.BackgroundTransparency = 1; HelpBtn.Text = "?"
     HelpBtn.TextColor3 = Color3.fromRGB(180, 185, 200); HelpBtn.TextSize = 17
     HelpBtn.Font = Enum.Font.GothamBold; HelpBtn.Parent = Topbar
 
+    -- Keybind info
     local KeybindBtn = Instance.new("TextButton")
     KeybindBtn.Size = UDim2.new(0, 34, 0, 34); KeybindBtn.Position = UDim2.new(1, -150, 0, 6)
     KeybindBtn.BackgroundTransparency = 1; KeybindBtn.Text = "⌨"
@@ -481,7 +464,6 @@ function AlatferaLib.CreateWindow(config)
 
     -- Open button
     local OpenBtnFrame = Instance.new("TextButton")
-    OpenBtnFrame.Name = "OpenGuiBtn"
     OpenBtnFrame.Size = UDim2.new(0, 120, 0, 32); OpenBtnFrame.Position = UDim2.new(0.5, -60, 0, 8)
     OpenBtnFrame.BackgroundColor3 = Color3.fromRGB(22, 25, 34); OpenBtnFrame.BackgroundTransparency = 0.35
     OpenBtnFrame.Text = "⚡ Mở GUI"; OpenBtnFrame.TextColor3 = themeColor
@@ -492,17 +474,12 @@ function AlatferaLib.CreateWindow(config)
         local OBS = Instance.new("UIStroke"); OBS.Color = themeColor; OBS.Transparency = 0.4; OBS.Thickness = 1; OBS.Parent = OpenBtnFrame
     end
 
-    -- Pulse animation cho OpenBtn
     task.spawn(function()
         while OpenBtnFrame.Parent do
-            TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                BackgroundTransparency = 0.55
-            }):Play()
+            TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.55}):Play()
             task.wait(0.7)
             if not OpenBtnFrame.Parent then break end
-            TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
-                BackgroundTransparency = 0.25
-            }):Play()
+            TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.25}):Play()
             task.wait(0.7)
         end
     end)
@@ -521,7 +498,6 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(mainScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
     end))
 
-    -- Minimize với bounce
     local isMinimized = false
     Track(MinimizeBtn.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
@@ -538,12 +514,12 @@ function AlatferaLib.CreateWindow(config)
     Track(HelpBtn.MouseButton1Click:Connect(function()
         Window:Notify({
             Title = "Hướng Dẫn",
-            Text = config.HelpText or "• Kéo topbar để di chuyển GUI.\n• Ô tìm kiếm lọc nhanh tính năng.\n• Nhấn " .. currentToggleKey.Name .. " để ẩn/hiện.",
-            Duration = 5
+            Text = "• Kéo topbar di chuyển GUI.\n• 🔒 Khóa GUI (không kéo được).\n• RightControl ẩn/hiện.",
+            Duration = 5,
         })
     end))
     Track(KeybindBtn.MouseButton1Click:Connect(function()
-        Window:Notify({ Title = "Phím Tắt", Text = "Phím ẩn/hiện: " .. tostring(currentToggleKey.Name), Duration = 4 })
+        Window:Notify({ Title = "Phím Tắt", Text = "Ẩn/hiện GUI: " .. tostring(currentToggleKey.Name), Duration = 4 })
     end))
 
     Track(UserInputService.InputBegan:Connect(function(input, gpe)
@@ -553,14 +529,16 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- Drag topbar
+    -- Drag (tôn trọng isLocked)
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
+        if isLocked then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true; dragStart = input.Position; startPos = MainFrame.Position
         end
     end))
     Track(UserInputService.InputChanged:Connect(function(input)
+        if isLocked then dragging = false; return end
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
@@ -570,11 +548,8 @@ function AlatferaLib.CreateWindow(config)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
     end))
 
-    -- ========================================================
-    -- 3. SIDEBAR
-    -- ========================================================
+    -- ============ SIDEBAR ============
     local Sidebar = Instance.new("ScrollingFrame")
-    Sidebar.Name = "Sidebar"
     Sidebar.Size = UDim2.new(0, 160, 1, showPlaytime and -86 or -58)
     Sidebar.Position = UDim2.new(0, 10, 0, 54)
     Sidebar.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
@@ -587,14 +562,12 @@ function AlatferaLib.CreateWindow(config)
     end
 
     local TabListLayout = Instance.new("UIListLayout")
-    TabListLayout.Padding = UDim.new(0, 6)
-    TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    TabListLayout.Padding = UDim.new(0, 6); TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabListLayout.Parent = Sidebar
     Track(TabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         Sidebar.CanvasSize = UDim2.new(0, 0, 0, TabListLayout.AbsoluteContentSize.Y + 10)
     end))
 
-    -- Active tab indicator (thanh dọc trượt)
     local ActiveIndicator = Instance.new("Frame")
     ActiveIndicator.Size = UDim2.new(0, 3, 0, 20)
     ActiveIndicator.Position = UDim2.new(0, 0, 0, 8)
@@ -613,14 +586,12 @@ function AlatferaLib.CreateWindow(config)
         if enableStroke then
             local PTS = Instance.new("UIStroke"); PTS.Color = strokeColor; PTS.Thickness = 1; PTS.Parent = PlaytimeFrame
         end
-
         local PlaytimeLabel = Instance.new("TextLabel")
         PlaytimeLabel.Size = UDim2.new(1, 0, 1, 0); PlaytimeLabel.BackgroundTransparency = 1
         PlaytimeLabel.Text = "⏱️ 00:00:00"
         PlaytimeLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
         PlaytimeLabel.Font = Enum.Font.Gotham; PlaytimeLabel.TextSize = 12
         PlaytimeLabel.Parent = PlaytimeFrame
-
         local startTime = os.time()
         task.spawn(function()
             while task.wait(1) do
@@ -635,7 +606,6 @@ function AlatferaLib.CreateWindow(config)
     end
 
     local ContentArea = Instance.new("Frame")
-    ContentArea.Name = "ContentArea"
     ContentArea.Size = UDim2.new(1, -188, 1, -62)
     ContentArea.Position = UDim2.new(0, 178, 0, 54)
     ContentArea.BackgroundTransparency = 1
@@ -658,20 +628,15 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- ========================================================
-    -- 4. NOTIFY
-    -- ========================================================
+    -- ============ NOTIFY ============
     local NotifContainer = Instance.new("Frame")
-    NotifContainer.Name = "NotifContainer"
     NotifContainer.Size = UDim2.new(0, 250, 1, -20)
     NotifContainer.Position = UDim2.new(1, -260, 0, 10)
     NotifContainer.BackgroundTransparency = 1
     NotifContainer.Parent = ScreenGui
-
     local NotifLayout = Instance.new("UIListLayout")
     NotifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-    NotifLayout.Padding = UDim.new(0, 6)
-    NotifLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    NotifLayout.Padding = UDim.new(0, 6); NotifLayout.SortOrder = Enum.SortOrder.LayoutOrder
     NotifLayout.Parent = NotifContainer
 
     function Window:Notify(notifConfig)
@@ -685,14 +650,11 @@ function AlatferaLib.CreateWindow(config)
         local Item = Instance.new("Frame")
         Item.Size = UDim2.new(1, 0, 0, 54)
         Item.BackgroundColor3 = Color3.fromRGB(22, 25, 34)
-        Item.BorderSizePixel = 0
-        Item.Parent = NotifContainer
+        Item.BorderSizePixel = 0; Item.Parent = NotifContainer
         local ICC = Instance.new("UICorner"); ICC.CornerRadius = UDim.new(0, cornerRadius); ICC.Parent = Item
         if enableStroke then
             local IS = Instance.new("UIStroke"); IS.Color = strokeColor; IS.Thickness = 1; IS.Parent = Item
         end
-
-        -- Pop-in effect
         local nScale = Instance.new("UIScale"); nScale.Scale = 0.7; nScale.Parent = Item
         TweenService:Create(nScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
@@ -733,9 +695,79 @@ function AlatferaLib.CreateWindow(config)
         end)
     end
 
-    -- ========================================================
-    -- 5. CREATE TAB
-    -- ========================================================
+    -- ============ TOOLTIP ============
+    local TooltipFrame = Instance.new("Frame")
+    TooltipFrame.Size = UDim2.new(0, 200, 0, 28)
+    TooltipFrame.BackgroundColor3 = Color3.fromRGB(30, 34, 46)
+    TooltipFrame.BorderSizePixel = 0
+    TooltipFrame.Visible = false
+    TooltipFrame.ZIndex = 100
+    TooltipFrame.Parent = ScreenGui
+    local TTC = Instance.new("UICorner"); TTC.CornerRadius = UDim.new(0, 6); TTC.Parent = TooltipFrame
+    if enableStroke then
+        local TTS = Instance.new("UIStroke"); TTS.Color = themeColor; TTS.Thickness = 1; TTS.Parent = TooltipFrame
+    end
+    local TooltipLabel = Instance.new("TextLabel")
+    TooltipLabel.Size = UDim2.new(1, -12, 1, 0); TooltipLabel.Position = UDim2.new(0, 6, 0, 0)
+    TooltipLabel.BackgroundTransparency = 1
+    TooltipLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+    TooltipLabel.Font = Enum.Font.Gotham; TooltipLabel.TextSize = 12
+    TooltipLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TooltipLabel.Parent = TooltipFrame
+
+    local function AddTooltip(widget, text)
+        Track(widget.MouseEnter:Connect(function()
+            TooltipLabel.Text = text
+            local w = math.clamp(#text * 7 + 20, 100, 260)
+            TooltipFrame.Size = UDim2.new(0, w, 0, 28)
+            TooltipFrame.Position = UDim2.new(0, widget.AbsolutePosition.X + widget.AbsoluteSize.X + 10, 0, widget.AbsolutePosition.Y + widget.AbsoluteSize.Y/2 - 14)
+            TooltipFrame.Visible = true
+        end))
+        Track(widget.MouseLeave:Connect(function()
+            TooltipFrame.Visible = false
+        end))
+    end
+
+    -- ============ PRESET METHODS (MỚI V11) ============
+    function Window:SavePreset(name)
+        if not name or name == "" then return false end
+        if not savedData["_Presets"] then savedData["_Presets"] = {} end
+        local snapshot = {}
+        for k, v in pairs(savedData) do
+            if k ~= "_Presets" and k ~= "_SavedKey" then snapshot[k] = v end
+        end
+        savedData["_Presets"][name] = snapshot
+        SaveCurrentConfig()
+        return true
+    end
+
+    function Window:LoadPreset(name)
+        if not savedData["_Presets"] or not savedData["_Presets"][name] then return false end
+        local snapshot = savedData["_Presets"][name]
+        for k, v in pairs(snapshot) do savedData[k] = v end
+        SaveCurrentConfig()
+        for _, fn in ipairs(presetAppliers) do pcall(fn) end
+        return true
+    end
+
+    function Window:GetPresets()
+        local list = {}
+        if savedData["_Presets"] then
+            for name, _ in pairs(savedData["_Presets"]) do table.insert(list, name) end
+        end
+        return list
+    end
+
+    function Window:DeletePreset(name)
+        if savedData["_Presets"] and savedData["_Presets"][name] then
+            savedData["_Presets"][name] = nil
+            SaveCurrentConfig()
+            return true
+        end
+        return false
+    end
+
+    -- ============ CREATE TAB ============
     function Window:CreateTab(tabName, iconEmoji)
         local Tab = {}
         local displayText = iconEmoji and (iconEmoji .. "  " .. tabName) or ("  " .. tabName)
@@ -754,7 +786,6 @@ function AlatferaLib.CreateWindow(config)
         end
 
         local TabContainer = Instance.new("ScrollingFrame")
-        TabContainer.Name = "Container_" .. tabName
         TabContainer.Size = UDim2.new(1, 0, 1, 0)
         TabContainer.BackgroundTransparency = 1
         TabContainer.BorderSizePixel = 0
@@ -764,14 +795,12 @@ function AlatferaLib.CreateWindow(config)
         TabContainer.Parent = ContentArea
 
         local ContainerLayout = Instance.new("UIListLayout")
-        ContainerLayout.Padding = UDim.new(0, 10)
-        ContainerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        ContainerLayout.Padding = UDim.new(0, 10); ContainerLayout.SortOrder = Enum.SortOrder.LayoutOrder
         ContainerLayout.Parent = TabContainer
         Track(ContainerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             TabContainer.CanvasSize = UDim2.new(0, 0, 0, ContainerLayout.AbsoluteContentSize.Y + 15)
         end))
 
-        -- Hover
         Track(TabButton.MouseEnter:Connect(function()
             if not TabContainer.Visible then
                 TweenService:Create(TabButton, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(24, 28, 40)}):Play()
@@ -796,22 +825,18 @@ function AlatferaLib.CreateWindow(config)
             TabContainer.Visible = true
             TabButton.BackgroundColor3 = Color3.fromRGB(28, 33, 46)
             TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-            -- Slide-in animation
             TabContainer.Position = UDim2.new(0.06, 0, 0, 0)
             TweenService:Create(TabContainer, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-                Position = UDim2.new(0, 0, 0, 0)
+                Position = UDim2.new(0, 0, 0, 0),
             }):Play()
-
-            -- Slide active indicator tới tab này
             TweenService:Create(ActiveIndicator, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
-                Position = UDim2.new(0, 0, 0, TabButton.AbsolutePosition.Y - Sidebar.AbsolutePosition.Y + Sidebar.CanvasPosition.Y + 8)
+                Position = UDim2.new(0, 0, 0, TabButton.AbsolutePosition.Y - Sidebar.AbsolutePosition.Y + Sidebar.CanvasPosition.Y + 8),
             }):Play()
         end))
 
         FirstTab = false
 
-        -- ---------- WIDGETS ----------
+        -- ===== WIDGET: LABEL =====
         function Tab:CreateLabel(text)
             local Label = Instance.new("TextLabel")
             Label.Size = UDim2.new(1, -10, 0, 28)
@@ -826,14 +851,59 @@ function AlatferaLib.CreateWindow(config)
                 local LS = Instance.new("UIStroke"); LS.Color = strokeColor; LS.Thickness = 1; LS.Parent = Label
             end
             Label:SetAttribute("SearchText", string.lower(text))
+            AddTooltip(Label, text)
+            return Label
         end
 
+        -- ===== WIDGET: PARAGRAPH (MỚI V11) =====
+        function Tab:CreateParagraph(text)
+            local Wrap = Instance.new("Frame")
+            Wrap.Size = UDim2.new(1, -10, 0, 0)
+            Wrap.AutomaticSize = Enum.AutomaticSize.Y
+            Wrap.BackgroundColor3 = Color3.fromRGB(22, 25, 34)
+            Wrap.BorderSizePixel = 0
+            Wrap.Parent = TabContainer
+            local WC = Instance.new("UICorner"); WC.CornerRadius = UDim.new(0, cornerRadius); WC.Parent = Wrap
+            if enableStroke then
+                local WS = Instance.new("UIStroke"); WS.Color = strokeColor; WS.Thickness = 1; WS.Parent = Wrap
+            end
+            local Padding = Instance.new("UIPadding")
+            Padding.PaddingTop = UDim.new(0, 8); Padding.PaddingBottom = UDim.new(0, 8)
+            Padding.PaddingLeft = UDim.new(0, 12); Padding.PaddingRight = UDim.new(0, 12)
+            Padding.Parent = Wrap
+
+            local TextLbl = Instance.new("TextLabel")
+            TextLbl.Size = UDim2.new(1, 0, 0, 0)
+            TextLbl.AutomaticSize = Enum.AutomaticSize.Y
+            TextLbl.BackgroundTransparency = 1
+            TextLbl.Text = text
+            TextLbl.TextColor3 = Color3.fromRGB(190, 195, 210)
+            TextLbl.Font = Enum.Font.Gotham; TextLbl.TextSize = 13
+            TextLbl.TextXAlignment = Enum.TextXAlignment.Left
+            TextLbl.TextYAlignment = Enum.TextYAlignment.Top
+            TextLbl.TextWrapped = true
+            TextLbl.Parent = Wrap
+            Wrap:SetAttribute("SearchText", string.lower(text))
+            return Wrap
+        end
+
+        -- ===== WIDGET: DIVIDER (MỚI V11) =====
+        function Tab:CreateDivider()
+            local Div = Instance.new("Frame")
+            Div.Size = UDim2.new(1, -20, 0, 1)
+            Div.Position = UDim2.new(0, 10, 0, 0)
+            Div.BackgroundColor3 = Color3.fromRGB(45, 50, 65)
+            Div.BorderSizePixel = 0
+            Div.Parent = TabContainer
+            return Div
+        end
+
+        -- ===== WIDGET: SECTION =====
         function Tab:CreateSection(text)
             local SectionFrame = Instance.new("Frame")
             SectionFrame.Size = UDim2.new(1, -10, 0, 24)
             SectionFrame.BackgroundTransparency = 1
             SectionFrame.Parent = TabContainer
-
             local SecText = Instance.new("TextLabel")
             SecText.Size = UDim2.new(1, 0, 1, 0); SecText.BackgroundTransparency = 1
             SecText.Text = "───  " .. string.upper(text or "SECTION") .. "  ───"
@@ -841,15 +911,13 @@ function AlatferaLib.CreateWindow(config)
             SecText.Font = Enum.Font.GothamBold; SecText.TextSize = 12
             SecText.TextTransparency = 1
             SecText.Parent = SectionFrame
-
-            -- Draw animation
             task.spawn(function()
                 TweenService:Create(SecText, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {TextTransparency = 0}):Play()
             end)
-
             SectionFrame:SetAttribute("SearchText", string.lower(text or ""))
         end
 
+        -- ===== WIDGET: BUTTON =====
         function Tab:CreateButton(btnText, callback)
             callback = callback or function() end
             local Button = Instance.new("TextButton")
@@ -863,7 +931,6 @@ function AlatferaLib.CreateWindow(config)
                 local BS = Instance.new("UIStroke"); BS.Color = strokeColor; BS.Thickness = 1; BS.Parent = Button
             end
             Button:SetAttribute("SearchText", string.lower(btnText))
-
             AttachButtonEffects(Button, Track, Color3.fromRGB(34, 40, 56))
 
             Track(Button.MouseButton1Click:Connect(function(input)
@@ -873,8 +940,10 @@ function AlatferaLib.CreateWindow(config)
                 TweenService:Create(Button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(24, 28, 38)}):Play()
                 callback()
             end))
+            return Button
         end
 
+        -- ===== WIDGET: TOGGLE =====
         function Tab:CreateToggle(toggleText, flagName, defaultState, callback)
             callback = callback or function() end
             if flagName and savedData[flagName] ~= nil then defaultState = savedData[flagName] end
@@ -912,32 +981,37 @@ function AlatferaLib.CreateWindow(config)
             Knob.BorderSizePixel = 0; Knob.Parent = TrackFrame
             local KC2 = Instance.new("UICorner"); KC2.CornerRadius = UDim.new(1, 0); KC2.Parent = Knob
 
-            local knobShadow = Instance.new("ImageLabel")
-            knobShadow.Size = UDim2.new(1, 6, 1, 6); knobShadow.Position = UDim2.new(0, -3, 0, -3)
-            knobShadow.BackgroundTransparency = 1
-            knobShadow.Image = "rbxassetid://5554236805"
-            knobShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-            knobShadow.ImageTransparency = 0.7
-            knobShadow.ZIndex = 0
-            knobShadow.Parent = Knob
-
-            Track(ToggleFrame.MouseButton1Click:Connect(function(input)
-                state = not state
-                -- Spring animation cho Knob
+            local function applyToggle(newState)
+                state = newState
                 TweenService:Create(TrackFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                    BackgroundColor3 = state and themeColor or Color3.fromRGB(50, 56, 72)
+                    BackgroundColor3 = state and themeColor or Color3.fromRGB(50, 56, 72),
                 }):Play()
                 TweenService:Create(Knob, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                    Position = state and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+                    Position = state and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9),
                 }):Play()
+            end
 
+            Track(ToggleFrame.MouseButton1Click:Connect(function()
+                state = not state
+                applyToggle(state)
                 if flagName then savedData[flagName] = state; SaveCurrentConfig() end
                 callback(state)
             end))
 
+            if flagName then
+                table.insert(presetAppliers, function()
+                    if savedData[flagName] ~= nil and savedData[flagName] ~= state then
+                        applyToggle(savedData[flagName])
+                        callback(savedData[flagName])
+                    end
+                end)
+            end
+
             if defaultState then callback(true) end
+            return ToggleFrame
         end
 
+        -- ===== WIDGET: SLIDER =====
         function Tab:CreateSlider(sliderText, flagName, minVal, maxVal, defaultVal, callback)
             callback = callback or function() end
             minVal = minVal or 0; maxVal = maxVal or 1000
@@ -983,37 +1057,28 @@ function AlatferaLib.CreateWindow(config)
             FillBar.BorderSizePixel = 0; FillBar.Parent = SliderBar
             local FBC = Instance.new("UICorner"); FBC.CornerRadius = UDim.new(1, 0); FBC.Parent = FillBar
 
-            -- Slider thumb (cục trượt)
             local Thumb = Instance.new("Frame")
             Thumb.Size = UDim2.new(0, 16, 0, 16)
             Thumb.Position = UDim2.new(initPercent, -8, 0.5, -8)
             Thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            Thumb.BorderSizePixel = 0
-            Thumb.ZIndex = 3
+            Thumb.BorderSizePixel = 0; Thumb.ZIndex = 3
             Thumb.Parent = SliderBar
             local THC = Instance.new("UICorner"); THC.CornerRadius = UDim.new(1, 0); THC.Parent = Thumb
-
             local ThumbStroke = Instance.new("UIStroke")
-            ThumbStroke.Color = themeColor
-            ThumbStroke.Thickness = 2
-            ThumbStroke.Transparency = 0
-            ThumbStroke.Parent = Thumb
-
-            -- Glow effect khi hover
-            local function setThumbHover(on)
-                TweenService:Create(Thumb, TweenInfo.new(0.15), {
-                    Size = on and UDim2.new(0, 20, 0, 20) or UDim2.new(0, 16, 0, 16),
-                    Position = on and UDim2.new(initPercent, -10, 0.5, -10) or UDim2.new(initPercent, -8, 0.5, -8)
-                }):Play()
-            end
+            ThumbStroke.Color = themeColor; ThumbStroke.Thickness = 2; ThumbStroke.Parent = Thumb
 
             local sliding = false
-            local function updateSlider(input)
-                local percent = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
-                local val = math.floor(minVal + (maxVal - minVal) * percent)
+            local function applyValue(val)
+                local percent = (val - minVal) / (maxVal - minVal)
                 FillBar.Size = UDim2.new(percent, 0, 1, 0)
                 Thumb.Position = UDim2.new(percent, -8, 0.5, -8)
                 ValueLabel.Text = tostring(val)
+            end
+
+            local function updateSlider(input)
+                local percent = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
+                local val = math.floor(minVal + (maxVal - minVal) * percent)
+                applyValue(val)
                 if flagName then savedData[flagName] = val; SaveCurrentConfig() end
                 callback(val)
             end
@@ -1035,8 +1100,18 @@ function AlatferaLib.CreateWindow(config)
                     TweenService:Create(ThumbStroke, TweenInfo.new(0.2), {Thickness = 2}):Play()
                 end
             end))
+
+            if flagName then
+                table.insert(presetAppliers, function()
+                    if savedData[flagName] ~= nil then
+                        applyValue(savedData[flagName])
+                        callback(savedData[flagName])
+                    end
+                end)
+            end
         end
 
+        -- ===== WIDGET: DROPDOWN =====
         function Tab:CreateDropdown(dropText, options, defaultOption, callback)
             callback = callback or function() end
             options = options or {}
@@ -1097,7 +1172,7 @@ function AlatferaLib.CreateWindow(config)
                 DropFrame:TweenSize(UDim2.new(1, -10, 0, targetHeight), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.25, true)
             end))
 
-            for i, opt in ipairs(options) do
+            for _, opt in ipairs(options) do
                 local OptBtn = Instance.new("TextButton")
                 OptBtn.Size = UDim2.new(1, 0, 0, 28)
                 OptBtn.BackgroundColor3 = Color3.fromRGB(18, 20, 26)
@@ -1106,14 +1181,12 @@ function AlatferaLib.CreateWindow(config)
                 OptBtn.Font = Enum.Font.Gotham; OptBtn.TextSize = 12
                 OptBtn.Parent = OptionContainer
                 local OBC2 = Instance.new("UICorner"); OBC2.CornerRadius = UDim.new(0, cornerRadius - 2); OBC2.Parent = OptBtn
-
                 Track(OptBtn.MouseEnter:Connect(function()
                     TweenService:Create(OptBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(28, 32, 42)}):Play()
                 end))
                 Track(OptBtn.MouseLeave:Connect(function()
                     TweenService:Create(OptBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(18, 20, 26)}):Play()
                 end))
-
                 Track(OptBtn.MouseButton1Click:Connect(function()
                     currentChoice = opt
                     SelectedLabel.Text = currentChoice .. " ▼"
@@ -1124,6 +1197,7 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
+        -- ===== WIDGET: TEXTBOX =====
         function Tab:CreateTextbox(boxText, flagName, maxChars, callback)
             callback = callback or function() end
             local defaultVal = ""
@@ -1169,19 +1243,182 @@ function AlatferaLib.CreateWindow(config)
 
             if maxChars then
                 Track(InputBox:GetPropertyChangedSignal("Text"):Connect(function()
-                    if #InputBox.Text > maxChars then
-                        InputBox.Text = string.sub(InputBox.Text, 1, maxChars)
-                    end
+                    if #InputBox.Text > maxChars then InputBox.Text = string.sub(InputBox.Text, 1, maxChars) end
                 end))
             end
+
+            if flagName then
+                table.insert(presetAppliers, function()
+                    if savedData[flagName] ~= nil then
+                        InputBox.Text = savedData[flagName]
+                        callback(savedData[flagName], false)
+                    end
+                end)
+            end
+        end
+
+        -- ===== WIDGET: KEYBIND (MỚI V11) =====
+        function Tab:CreateKeybind(labelText, flagName, defaultKey, callback)
+            callback = callback or function() end
+            local currentKey = defaultKey or Enum.KeyCode.Unknown
+            if flagName and savedData[flagName] then
+                pcall(function() currentKey = Enum.KeyCode[savedData[flagName]] end)
+            end
+            local listening = false
+
+            local BindFrame = Instance.new("Frame")
+            BindFrame.Size = UDim2.new(1, -10, 0, 38)
+            BindFrame.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            BindFrame.Parent = TabContainer
+            local BKC = Instance.new("UICorner"); BKC.CornerRadius = UDim.new(0, cornerRadius); BKC.Parent = BindFrame
+            if enableStroke then
+                local BKS = Instance.new("UIStroke"); BKS.Color = strokeColor; BKS.Thickness = 1; BKS.Parent = BindFrame
+            end
+            BindFrame:SetAttribute("SearchText", string.lower(labelText))
+
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(0.5, -10, 1, 0); Label.Position = UDim2.new(0, 14, 0, 0)
+            Label.BackgroundTransparency = 1; Label.Text = labelText
+            Label.TextColor3 = Color3.fromRGB(240, 240, 245)
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Font = Enum.Font.Gotham; Label.TextSize = 13
+            Label.Parent = BindFrame
+
+            local KeyBtn = Instance.new("TextButton")
+            KeyBtn.Size = UDim2.new(0, 100, 0, 26); KeyBtn.Position = UDim2.new(1, -110, 0.5, -13)
+            KeyBtn.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
+            KeyBtn.Text = currentKey.Name
+            KeyBtn.TextColor3 = themeColor
+            KeyBtn.Font = Enum.Font.GothamBold; KeyBtn.TextSize = 12
+            KeyBtn.Parent = BindFrame
+            local KBC = Instance.new("UICorner"); KBC.CornerRadius = UDim.new(0, cornerRadius - 2); KBC.Parent = KeyBtn
+
+            Track(KeyBtn.MouseButton1Click:Connect(function()
+                listening = true
+                KeyBtn.Text = "Nhấn phím..."
+                KeyBtn.TextColor3 = Color3.fromRGB(255, 180, 80)
+            end))
+
+            Track(UserInputService.InputBegan:Connect(function(input, gpe)
+                if not listening then return end
+                if gpe then return end
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    currentKey = input.KeyCode
+                    listening = false
+                    KeyBtn.Text = currentKey.Name
+                    KeyBtn.TextColor3 = themeColor
+                    if flagName then savedData[flagName] = currentKey.Name; SaveCurrentConfig() end
+                    callback(currentKey)
+                end
+            end))
+
+            if flagName then
+                table.insert(presetAppliers, function()
+                    if savedData[flagName] then
+                        pcall(function()
+                            currentKey = Enum.KeyCode[savedData[flagName]]
+                            KeyBtn.Text = currentKey.Name
+                            callback(currentKey)
+                        end)
+                    end
+                end)
+            end
+
+            return {
+                GetKey = function() return currentKey end,
+                SetKey = function(k)
+                    currentKey = k
+                    KeyBtn.Text = k.Name
+                    if flagName then savedData[flagName] = k.Name; SaveCurrentConfig() end
+                    callback(k)
+                end,
+            }
+        end
+
+        -- ===== WIDGET: PROGRESS BAR (MỚI V11) =====
+        function Tab:CreateProgressBar(labelText, initialPercent)
+            local percent = math.clamp(initialPercent or 0, 0, 100)
+
+            local PFrame = Instance.new("Frame")
+            PFrame.Size = UDim2.new(1, -10, 0, 46)
+            PFrame.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            PFrame.Parent = TabContainer
+            local PFC = Instance.new("UICorner"); PFC.CornerRadius = UDim.new(0, cornerRadius); PFC.Parent = PFrame
+            if enableStroke then
+                local PFS = Instance.new("UIStroke"); PFS.Color = strokeColor; PFS.Thickness = 1; PFS.Parent = PFrame
+            end
+            PFrame:SetAttribute("SearchText", string.lower(labelText))
+
+            local Label = Instance.new("TextLabel")
+            Label.Size = UDim2.new(0.7, 0, 0, 22); Label.Position = UDim2.new(0, 14, 0, 3)
+            Label.BackgroundTransparency = 1; Label.Text = labelText
+            Label.TextColor3 = Color3.fromRGB(240, 240, 245)
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+            Label.Font = Enum.Font.Gotham; Label.TextSize = 13
+            Label.Parent = PFrame
+
+            local ValueLabel = Instance.new("TextLabel")
+            ValueLabel.Size = UDim2.new(0.3, -14, 0, 22); ValueLabel.Position = UDim2.new(0.7, 0, 0, 3)
+            ValueLabel.BackgroundTransparency = 1; ValueLabel.Text = math.floor(percent) .. "%"
+            ValueLabel.TextColor3 = themeColor
+            ValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+            ValueLabel.Font = Enum.Font.GothamBold; ValueLabel.TextSize = 13
+            ValueLabel.Parent = PFrame
+
+            local BarBg = Instance.new("Frame")
+            BarBg.Size = UDim2.new(1, -28, 0, 8); BarBg.Position = UDim2.new(0, 14, 0, 30)
+            BarBg.BackgroundColor3 = Color3.fromRGB(50, 56, 72)
+            BarBg.BorderSizePixel = 0; BarBg.Parent = PFrame
+            local BBC = Instance.new("UICorner"); BBC.CornerRadius = UDim.new(1, 0); BBC.Parent = BarBg
+
+            local BarFill = Instance.new("Frame")
+            BarFill.Size = UDim2.new(percent/100, 0, 1, 0)
+            BarFill.BackgroundColor3 = themeColor
+            BarFill.BorderSizePixel = 0; BarFill.Parent = BarBg
+            local BFC2 = Instance.new("UICorner"); BFC2.CornerRadius = UDim.new(1, 0); BFC2.Parent = BarFill
+
+            local obj = {}
+            function obj:Set(p)
+                percent = math.clamp(p, 0, 100)
+                TweenService:Create(BarFill, TweenInfo.new(0.35, Enum.EasingStyle.Quart), {Size = UDim2.new(percent/100, 0, 1, 0)}):Play()
+                ValueLabel.Text = math.floor(percent) .. "%"
+            end
+            function obj:Get() return percent end
+            return obj
+        end
+
+        -- ===== WIDGET: IMAGE (MỚI V11 - TÙY CHỌN) =====
+        function Tab:CreateImage(imageId, height)
+            if not imageId then return nil end
+            local h = height or 100
+
+            local ImgFrame = Instance.new("Frame")
+            ImgFrame.Size = UDim2.new(1, -10, 0, h)
+            ImgFrame.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            ImgFrame.BorderSizePixel = 0
+            ImgFrame.ClipsDescendants = true
+            ImgFrame.Parent = TabContainer
+            local IFC = Instance.new("UICorner"); IFC.CornerRadius = UDim.new(0, cornerRadius); IFC.Parent = ImgFrame
+            if enableStroke then
+                local IFS = Instance.new("UIStroke"); IFS.Color = strokeColor; IFS.Thickness = 1; IFS.Parent = ImgFrame
+            end
+
+            local Img = Instance.new("ImageLabel")
+            Img.Size = UDim2.new(1, -16, 1, -16)
+            Img.Position = UDim2.new(0, 8, 0, 8)
+            Img.BackgroundTransparency = 1
+            Img.Image = typeof(imageId) == "number" and ("rbxassetid://" .. imageId) or imageId
+            Img.ScaleType = Enum.ScaleType.Fit
+            Img.Parent = ImgFrame
+
+            ImgFrame:SetAttribute("SearchText", "image ảnh logo")
+            return ImgFrame
         end
 
         return Tab
     end
 
-    -- ========================================================
-    -- 6. DESTROY với animation
-    -- ========================================================
+    -- ============ DESTROY ============
     function Window:Destroy()
         TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
         task.wait(0.3)
