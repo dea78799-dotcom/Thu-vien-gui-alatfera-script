@@ -1,7 +1,7 @@
 --[[
     ============================================
-    ALATFERA LIB V12 - VISUAL EDITION
-    Thêm: Blur Background, Particle Effects
+    ALATFERA LIB V12.1 - VISUAL EDITION (FIXED)
+    Fix: Tắt GUI → tự động tắt Blur + Particle
     API 100% tương thích V11
     ============================================
 ]]
@@ -90,7 +90,7 @@ end
 function AlatferaLib.CreateWindow(config)
     config = config or {}
     local hubTitle       = config.Title or "Alatfera Script"
-    local hubVersion     = config.Version or "v12.0"
+    local hubVersion     = config.Version or "v12.1"
     local showPlaytime   = (config.ShowPlaytime == nil) and true or config.ShowPlaytime
     local scriptNameText = config.LoadingScriptName or "Alatfera Script"
     local statusText     = config.LoadingStatus or "Đang tải giao diện..."
@@ -106,7 +106,7 @@ function AlatferaLib.CreateWindow(config)
     local maxAttempts  = config.MaxAttempts or 10
     local remainingAttempts = maxAttempts
 
-    -- === VISUAL EFFECTS (V12) ===
+    -- === VISUAL EFFECTS ===
     local enableBlur = (config.BlurBackground == nil) and true or config.BlurBackground
     local enableParticles = (config.ParticleEffects == nil) and true or config.ParticleEffects
     local blurSize = config.BlurSize or 20
@@ -345,8 +345,12 @@ function AlatferaLib.CreateWindow(config)
     local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
     TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
+    -- ✅ FIX: Biến lưu trạng thái Blur/Particle khi đóng GUI
+    local savedBlurState = enableBlur
+    local savedParticleState = enableParticles
+
     -- ═══════════════════════════════════════════
-    -- BLUR BACKGROUND (V12)
+    -- BLUR BACKGROUND
     -- ═══════════════════════════════════════════
     local blurEffect = nil
     if enableBlur then
@@ -357,7 +361,7 @@ function AlatferaLib.CreateWindow(config)
     end
 
     -- ═══════════════════════════════════════════
-    -- PARTICLE EFFECTS (V12)
+    -- PARTICLE EFFECTS
     -- ═══════════════════════════════════════════
     local particleContainer = nil
     local particleList = {}
@@ -382,11 +386,9 @@ function AlatferaLib.CreateWindow(config)
             p.BackgroundTransparency = math.random(40, 80) / 100
             p.ZIndex = 0
             p.Parent = particleContainer
-
             local pc = Instance.new("UICorner")
             pc.CornerRadius = UDim.new(1, 0)
             pc.Parent = p
-
             table.insert(particleList, {
                 frame = p,
                 speed = math.random(15, 50) / 1000,
@@ -419,7 +421,7 @@ function AlatferaLib.CreateWindow(config)
         createParticles()
     end
 
-    -- Topbar
+    -- ============ TOPBAR ============
     local Topbar = Instance.new("Frame")
     Topbar.Size = UDim2.new(1, 0, 0, 46)
     Topbar.BackgroundColor3 = Color3.fromRGB(20, 23, 32); Topbar.BorderSizePixel = 0
@@ -495,7 +497,7 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(12, 14, 19)}):Play()
     end))
 
-    -- === LOCK BUTTON ===
+    -- LOCK BUTTON
     local isLocked = false
     local LockBtn = Instance.new("TextButton")
     LockBtn.Size = UDim2.new(0, 34, 0, 34); LockBtn.Position = UDim2.new(1, -186, 0, 6)
@@ -564,18 +566,27 @@ function AlatferaLib.CreateWindow(config)
         end
     end)
 
+    -- ✅ FIX: Nút Close - Lưu và tắt Blur/Particle
     Track(CloseBtn.MouseButton1Click:Connect(function()
+        savedBlurState = Window:IsBlurEnabled()
+        savedParticleState = Window:IsParticlesEnabled()
+        Window:SetBlur(false)
+        Window:SetParticles(false)
         TweenService:Create(mainScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
         task.wait(0.25)
         MainFrame.Visible = false
         mainScale.Scale = 1
         OpenBtnFrame.Visible = true
     end))
+
+    -- ✅ FIX: Nút Open - Khôi phục Blur/Particle
     Track(OpenBtnFrame.MouseButton1Click:Connect(function()
         MainFrame.Visible = true
         OpenBtnFrame.Visible = false
         mainScale.Scale = 0.85
         TweenService:Create(mainScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        if savedBlurState then Window:SetBlur(true) end
+        if savedParticleState then Window:SetParticles(true) end
     end))
 
     local isMinimized = false
@@ -602,10 +613,22 @@ function AlatferaLib.CreateWindow(config)
         Window:Notify({ Title = "Phím Tắt", Text = "Ẩn/hiện GUI: " .. tostring(currentToggleKey.Name), Duration = 4 })
     end))
 
+    -- ✅ FIX: Phím tắt RightControl - Lưu và tắt Blur/Particle
     Track(UserInputService.InputBegan:Connect(function(input, gpe)
         if not gpe and input.KeyCode == currentToggleKey then
-            MainFrame.Visible = not MainFrame.Visible
-            OpenBtnFrame.Visible = not MainFrame.Visible
+            if MainFrame.Visible then
+                savedBlurState = Window:IsBlurEnabled()
+                savedParticleState = Window:IsParticlesEnabled()
+                Window:SetBlur(false)
+                Window:SetParticles(false)
+                MainFrame.Visible = false
+                OpenBtnFrame.Visible = true
+            else
+                MainFrame.Visible = true
+                OpenBtnFrame.Visible = false
+                if savedBlurState then Window:SetBlur(true) end
+                if savedParticleState then Window:SetParticles(true) end
+            end
         end
     end))
 
@@ -1498,7 +1521,7 @@ function AlatferaLib.CreateWindow(config)
         return Tab
     end
 
-    -- ============ BẬT/TẮT VISUAL EFFECTS (V12) ============
+    -- ============ BẬT/TẮT VISUAL EFFECTS ============
     function Window:SetBlur(enabled)
         if enabled then
             if not blurEffect or not blurEffect.Parent then
