@@ -1,8 +1,7 @@
 --[[
     ============================================
-    ALATFERA LIB V13.1 - PRO EDITION
-    Bao gồm: ColorPicker, Theme Switcher, Tooltip,
-             Multi-Dropdown, Sub-Tabs, Mini Window
+    ALATFERA LIB V13.2 - PRO EDITION
+    Đã sửa: Xóa nút ↑, kéo GUI mọi nơi, nút sát nhau
     ============================================
 ]]
 
@@ -90,7 +89,7 @@ end
 function AlatferaLib.CreateWindow(config)
     config = config or {}
     local hubTitle       = config.Title or "Alatfera Script"
-    local hubVersion     = config.Version or "v13.1"
+    local hubVersion     = config.Version or "v13.2"
     local showPlaytime   = (config.ShowPlaytime == nil) and true or config.ShowPlaytime
     local scriptNameText = config.LoadingScriptName or "Alatfera Script"
     local statusText     = config.LoadingStatus or "Đang tải giao diện..."
@@ -336,532 +335,536 @@ function AlatferaLib.CreateWindow(config)
     TweenService:Create(lScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
     task.wait(0.25)
     LoadingFrame:Destroy()
-    -- ============ MAIN WINDOW ============
-    local Window = {}
-    Window.ThemeColor = themeColor
+-- ============ MAIN WINDOW ============
+local Window = {}
+Window.ThemeColor = themeColor
 
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0.70, 0, 0.88, 0)
-    MainFrame.Position = UDim2.new(0.15, 0, 0.06, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
-    local MC = Instance.new("UICorner"); MC.CornerRadius = UDim.new(0, cornerRadius); MC.Parent = MainFrame
-    if enableStroke then
-        local MS = Instance.new("UIStroke"); MS.Color = strokeColor; MS.Thickness = 2; MS.Parent = MainFrame
-    end
-    local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
-    TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0.70, 0, 0.88, 0)
+MainFrame.Position = UDim2.new(0.15, 0, 0.06, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+local MC = Instance.new("UICorner"); MC.CornerRadius = UDim.new(0, cornerRadius); MC.Parent = MainFrame
+if enableStroke then
+    local MS = Instance.new("UIStroke"); MS.Color = strokeColor; MS.Thickness = 2; MS.Parent = MainFrame
+end
+local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
+TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
-    local savedBlurState = enableBlur
-    local savedParticleState = enableParticles
+local savedBlurState = enableBlur
+local savedParticleState = enableParticles
 
-    local blurEffect = nil
-    if enableBlur then
-        blurEffect = Instance.new("BlurEffect")
-        blurEffect.Size = 0
-        blurEffect.Parent = Lighting
-        TweenService:Create(blurEffect, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = blurSize}):Play()
-    end
+local blurEffect = nil
+if enableBlur then
+    blurEffect = Instance.new("BlurEffect")
+    blurEffect.Size = 0
+    blurEffect.Parent = Lighting
+    TweenService:Create(blurEffect, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = blurSize}):Play()
+end
 
-    local particleContainer = nil
-    local particleList = {}
-    local particleConn = nil
+local particleContainer = nil
+local particleList = {}
+local particleConn = nil
 
-    local function createParticles()
-        particleContainer = Instance.new("Frame")
-        particleContainer.Name = "ParticleContainer"
-        particleContainer.Size = UDim2.new(1, 0, 1, 0)
-        particleContainer.BackgroundTransparency = 1
-        particleContainer.ZIndex = 0
-        particleContainer.Parent = ScreenGui
-        particleList = {}
-        for i = 1, particleCount do
-            local p = Instance.new("Frame")
-            local size = math.random(3, 8)
-            p.Size = UDim2.new(0, size, 0, size)
-            p.Position = UDim2.new(math.random(), 0, math.random(), 0)
-            p.BackgroundColor3 = particleColor
-            p.BorderSizePixel = 0
-            p.BackgroundTransparency = math.random(40, 80) / 100
-            p.ZIndex = 0
-            p.Parent = particleContainer
-            local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(1, 0); pc.Parent = p
-            table.insert(particleList, {
-                frame = p,
-                speed = math.random(15, 50) / 1000,
-                drift = (math.random() - 0.5) * 0.0008,
-                wobble = math.random() * math.pi * 2,
-            })
-        end
-        particleConn = RunService.RenderStepped:Connect(function(dt)
-            for _, data in ipairs(particleList) do
-                local p = data.frame
-                if p and p.Parent then
-                    data.wobble = data.wobble + dt * 2
-                    local newY = p.Position.Y.Scale - data.speed * dt * 60
-                    local newX = p.Position.X.Scale + data.drift + math.sin(data.wobble) * 0.0005
-                    if newY < -0.05 then newY = 1.05; newX = math.random() end
-                    if newX < -0.05 then newX = 1.05 elseif newX > 1.05 then newX = -0.05 end
-                    p.Position = UDim2.new(newX, 0, newY, 0)
-                end
-            end
-        end)
-        Track(particleConn)
-    end
-
-    if enableParticles then createParticles() end
-
-    -- TOPBAR
-    local Topbar = Instance.new("Frame")
-    Topbar.Size = UDim2.new(1, 0, 0, 46)
-    Topbar.BackgroundColor3 = Color3.fromRGB(20, 23, 32); Topbar.BorderSizePixel = 0
-    Topbar.Parent = MainFrame
-    local TC = Instance.new("UICorner"); TC.CornerRadius = UDim.new(0, cornerRadius); TC.Parent = Topbar
-
-    local topGradient = Instance.new("UIGradient")
-    topGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 23, 32)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 34, 48)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 23, 32)),
-    })
-    topGradient.Parent = Topbar
-    Track(RunService.RenderStepped:Connect(function()
-        topGradient.Offset = Vector2.new(math.sin(tick() * 0.25) * 0.4, 0)
-    end))
-
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(0.28, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 18, 0, 0)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = hubTitle .. (hubVersion ~= "" and ("  <font color=\"" .. hexStringOf(themeColor) .. "\">" .. hubVersion .. "</font>") or "")
-    TitleLabel.RichText = true
-    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 15
-    TitleLabel.Parent = Topbar
-
-    local StatsLabel = Instance.new("TextLabel")
-    StatsLabel.Size = UDim2.new(0.22, 0, 1, 0); StatsLabel.Position = UDim2.new(0.28, 10, 0, 0)
-    StatsLabel.BackgroundTransparency = 1; StatsLabel.Text = "⚡ 60 FPS | 0 ms"
-    StatsLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
-    StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
-    StatsLabel.Font = Enum.Font.Gotham; StatsLabel.TextSize = 12
-    StatsLabel.Parent = Topbar
-
-    local frameCount, lastTime = 0, tick()
-    Track(RunService.RenderStepped:Connect(function()
-        frameCount = frameCount + 1
-        local currentTime = tick()
-        if currentTime - lastTime >= 1 then
-            local fps = math.floor(frameCount / (currentTime - lastTime))
-            local ok, ping = pcall(function() return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-            StatsLabel.Text = string.format("⚡ %d FPS | %d ms", fps, ok and ping or 0)
-            frameCount = 0; lastTime = currentTime
-        end
-    end))
-
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 34, 0, 34); CloseBtn.Position = UDim2.new(1, -42, 0, 6)
-    CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "✕"
-    CloseBtn.TextColor3 = Color3.fromRGB(245, 70, 90); CloseBtn.TextSize = 17
-    CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.Parent = Topbar
-
-    local SearchBox = Instance.new("TextBox")
-    SearchBox.Size = UDim2.new(0, 160, 0, 28); SearchBox.Position = UDim2.new(1, -350, 0, 9)
-    SearchBox.BackgroundColor3 = Color3.fromRGB(12, 14, 19); SearchBox.Text = ""
-    SearchBox.PlaceholderText = "🔍 Tìm kiếm..."
-    SearchBox.TextColor3 = Color3.fromRGB(240, 240, 245)
-    SearchBox.PlaceholderColor3 = Color3.fromRGB(110, 115, 130)
-    SearchBox.Font = Enum.Font.Gotham; SearchBox.TextSize = 12
-    SearchBox.Parent = Topbar
-    local SrC = Instance.new("UICorner"); SrC.CornerRadius = UDim.new(0, 8); SrC.Parent = SearchBox
-    if enableStroke then
-        local SrS = Instance.new("UIStroke"); SrS.Color = strokeColor; SrS.Thickness = 1; SrS.Parent = SearchBox
-    end
-
-    local isLocked = false
-    local LockBtn = Instance.new("TextButton")
-    LockBtn.Size = UDim2.new(0, 34, 0, 34); LockBtn.Position = UDim2.new(1, -186, 0, 6)
-    LockBtn.BackgroundTransparency = 1; LockBtn.Text = "🔓"
-    LockBtn.TextColor3 = Color3.fromRGB(180, 185, 200); LockBtn.TextSize = 16
-    LockBtn.Font = Enum.Font.GothamBold; LockBtn.Parent = Topbar
-
-    Track(LockBtn.MouseButton1Click:Connect(function()
-        isLocked = not isLocked
-        LockBtn.Text = isLocked and "🔒" or "🔓"
-        LockBtn.TextColor3 = isLocked and themeColor or Color3.fromRGB(180, 185, 200)
-        Window:Notify({
-            Title = isLocked and "🔒 Đã Khóa" or "🔓 Đã Mở",
-            Text = isLocked and "GUI sẽ không kéo được nữa." or "Có thể kéo GUI bình thường.",
-            Duration = 1.5,
-            Color = isLocked and "red" or "green",
+local function createParticles()
+    particleContainer = Instance.new("Frame")
+    particleContainer.Name = "ParticleContainer"
+    particleContainer.Size = UDim2.new(1, 0, 1, 0)
+    particleContainer.BackgroundTransparency = 1
+    particleContainer.ZIndex = 0
+    particleContainer.Parent = ScreenGui
+    particleList = {}
+    for i = 1, particleCount do
+        local p = Instance.new("Frame")
+        local size = math.random(3, 8)
+        p.Size = UDim2.new(0, size, 0, size)
+        p.Position = UDim2.new(math.random(), 0, math.random(), 0)
+        p.BackgroundColor3 = particleColor
+        p.BorderSizePixel = 0
+        p.BackgroundTransparency = math.random(40, 80) / 100
+        p.ZIndex = 0
+        p.Parent = particleContainer
+        local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(1, 0); pc.Parent = p
+        table.insert(particleList, {
+            frame = p,
+            speed = math.random(15, 50) / 1000,
+            drift = (math.random() - 0.5) * 0.0008,
+            wobble = math.random() * math.pi * 2,
         })
-    end))
-
-    local MinimizeBtn = Instance.new("TextButton")
-    MinimizeBtn.Size = UDim2.new(0, 34, 0, 34); MinimizeBtn.Position = UDim2.new(1, -78, 0, 6)
-    MinimizeBtn.BackgroundTransparency = 1; MinimizeBtn.Text = "↑"
-    MinimizeBtn.TextColor3 = Color3.fromRGB(180, 185, 200); MinimizeBtn.TextSize = 18
-    MinimizeBtn.Font = Enum.Font.GothamBold; MinimizeBtn.Parent = Topbar
-
-    local HelpBtn = Instance.new("TextButton")
-    HelpBtn.Size = UDim2.new(0, 34, 0, 34); HelpBtn.Position = UDim2.new(1, -114, 0, 6)
-    HelpBtn.BackgroundTransparency = 1; HelpBtn.Text = "?"
-    HelpBtn.TextColor3 = Color3.fromRGB(180, 185, 200); HelpBtn.TextSize = 17
-    HelpBtn.Font = Enum.Font.GothamBold; HelpBtn.Parent = Topbar
-
-    local KeybindBtn = Instance.new("TextButton")
-    KeybindBtn.Size = UDim2.new(0, 34, 0, 34); KeybindBtn.Position = UDim2.new(1, -150, 0, 6)
-    KeybindBtn.BackgroundTransparency = 1; KeybindBtn.Text = "⌨"
-    KeybindBtn.TextColor3 = Color3.fromRGB(180, 185, 200); KeybindBtn.TextSize = 17
-    KeybindBtn.Font = Enum.Font.GothamBold; KeybindBtn.Parent = Topbar
-
-    local OpenBtnFrame = Instance.new("TextButton")
-    OpenBtnFrame.Size = UDim2.new(0, 120, 0, 32); OpenBtnFrame.Position = UDim2.new(0.5, -60, 0, 8)
-    OpenBtnFrame.BackgroundColor3 = Color3.fromRGB(22, 25, 34); OpenBtnFrame.BackgroundTransparency = 0.35
-    OpenBtnFrame.Text = "⚡ Mở GUI"; OpenBtnFrame.TextColor3 = themeColor
-    OpenBtnFrame.Font = Enum.Font.GothamBold; OpenBtnFrame.TextSize = 13
-    OpenBtnFrame.Visible = false; OpenBtnFrame.Parent = ScreenGui
-    local OBC = Instance.new("UICorner"); OBC.CornerRadius = UDim.new(0, 16); OBC.Parent = OpenBtnFrame
-    if enableStroke then
-        local OBS = Instance.new("UIStroke"); OBS.Color = themeColor; OBS.Transparency = 0.4; OBS.Thickness = 1; OBS.Parent = OpenBtnFrame
     end
-    registerTheme(OpenBtnFrame, "TextColor3")
-
-    task.spawn(function()
-        while OpenBtnFrame.Parent do
-            TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.55}):Play()
-            task.wait(0.7)
-            if not OpenBtnFrame.Parent then break end
-            TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.25}):Play()
-            task.wait(0.7)
+    particleConn = RunService.RenderStepped:Connect(function(dt)
+        for _, data in ipairs(particleList) do
+            local p = data.frame
+            if p and p.Parent then
+                data.wobble = data.wobble + dt * 2
+                local newY = p.Position.Y.Scale - data.speed * dt * 60
+                local newX = p.Position.X.Scale + data.drift + math.sin(data.wobble) * 0.0005
+                if newY < -0.05 then newY = 1.05; newX = math.random() end
+                if newX < -0.05 then newX = 1.05 elseif newX > 1.05 then newX = -0.05 end
+                p.Position = UDim2.new(newX, 0, newY, 0)
+            end
         end
     end)
+    Track(particleConn)
+end
 
-    Track(CloseBtn.MouseButton1Click:Connect(function()
-        savedBlurState = Window:IsBlurEnabled()
-        savedParticleState = Window:IsParticlesEnabled()
-        Window:SetBlur(false)
-        Window:SetParticles(false)
-        TweenService:Create(mainScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
-        task.wait(0.25)
-        MainFrame.Visible = false
-        mainScale.Scale = 1
-        OpenBtnFrame.Visible = true
-    end))
+if enableParticles then createParticles() end
 
-    Track(OpenBtnFrame.MouseButton1Click:Connect(function()
-        MainFrame.Visible = true
-        OpenBtnFrame.Visible = false
-        mainScale.Scale = 0.85
-        TweenService:Create(mainScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-        if savedBlurState then Window:SetBlur(true) end
-        if savedParticleState then Window:SetParticles(true) end
-    end))
+-- TOPBAR
+local Topbar = Instance.new("Frame")
+Topbar.Size = UDim2.new(1, 0, 0, 46)
+Topbar.BackgroundColor3 = Color3.fromRGB(20, 23, 32); Topbar.BorderSizePixel = 0
+Topbar.Parent = MainFrame
+local TC = Instance.new("UICorner"); TC.CornerRadius = UDim.new(0, cornerRadius); TC.Parent = Topbar
 
-    local isMinimized = false
-    Track(MinimizeBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        if isMinimized then
-            MinimizeBtn.Text = "↓"
-            MainFrame:TweenSize(UDim2.new(0.70, 0, 0, 46), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
+local topGradient = Instance.new("UIGradient")
+topGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 23, 32)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 34, 48)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 23, 32)),
+})
+topGradient.Parent = Topbar
+Track(RunService.RenderStepped:Connect(function()
+    topGradient.Offset = Vector2.new(math.sin(tick() * 0.25) * 0.4, 0)
+end))
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(0.28, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 18, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = hubTitle .. (hubVersion ~= "" and ("  <font color=\"" .. hexStringOf(themeColor) .. "\">" .. hubVersion .. "</font>") or "")
+TitleLabel.RichText = true
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 15
+TitleLabel.Parent = Topbar
+
+local StatsLabel = Instance.new("TextLabel")
+StatsLabel.Size = UDim2.new(0.22, 0, 1, 0); StatsLabel.Position = UDim2.new(0.28, 10, 0, 0)
+StatsLabel.BackgroundTransparency = 1; StatsLabel.Text = "⚡ 60 FPS | 0 ms"
+StatsLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
+StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatsLabel.Font = Enum.Font.Gotham; StatsLabel.TextSize = 12
+StatsLabel.Parent = Topbar
+
+local frameCount, lastTime = 0, tick()
+Track(RunService.RenderStepped:Connect(function()
+    frameCount = frameCount + 1
+    local currentTime = tick()
+    if currentTime - lastTime >= 1 then
+        local fps = math.floor(frameCount / (currentTime - lastTime))
+        local ok, ping = pcall(function() return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+        StatsLabel.Text = string.format("⚡ %d FPS | %d ms", fps, ok and ping or 0)
+        frameCount = 0; lastTime = currentTime
+    end
+end))
+
+-- Các nút topbar - ĐÃ ĐƯA SÁT NHAU HƠN (V13.2)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 34, 0, 34); CloseBtn.Position = UDim2.new(1, -42, 0, 6)
+CloseBtn.BackgroundTransparency = 1; CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(245, 70, 90); CloseBtn.TextSize = 17
+CloseBtn.Font = Enum.Font.GothamBold; CloseBtn.Parent = Topbar
+
+local SearchBox = Instance.new("TextBox")
+SearchBox.Size = UDim2.new(0, 160, 0, 28); SearchBox.Position = UDim2.new(1, -316, 0, 9)
+SearchBox.BackgroundColor3 = Color3.fromRGB(12, 14, 19); SearchBox.Text = ""
+SearchBox.PlaceholderText = "🔍 Tìm kiếm..."
+SearchBox.TextColor3 = Color3.fromRGB(240, 240, 245)
+SearchBox.PlaceholderColor3 = Color3.fromRGB(110, 115, 130)
+SearchBox.Font = Enum.Font.Gotham; SearchBox.TextSize = 12
+SearchBox.Name = "SearchBox"
+SearchBox.Parent = Topbar
+local SrC = Instance.new("UICorner"); SrC.CornerRadius = UDim.new(0, 8); SrC.Parent = SearchBox
+if enableStroke then
+    local SrS = Instance.new("UIStroke"); SrS.Color = strokeColor; SrS.Thickness = 1; SrS.Parent = SearchBox
+end
+
+local isLocked = false
+local LockBtn = Instance.new("TextButton")
+LockBtn.Size = UDim2.new(0, 34, 0, 34); LockBtn.Position = UDim2.new(1, -150, 0, 6)
+LockBtn.BackgroundTransparency = 1; LockBtn.Text = "🔓"
+LockBtn.TextColor3 = Color3.fromRGB(180, 185, 200); LockBtn.TextSize = 16
+LockBtn.Font = Enum.Font.GothamBold; LockBtn.Parent = Topbar
+
+Track(LockBtn.MouseButton1Click:Connect(function()
+    isLocked = not isLocked
+    LockBtn.Text = isLocked and "🔒" or "🔓"
+    LockBtn.TextColor3 = isLocked and themeColor or Color3.fromRGB(180, 185, 200)
+    Window:Notify({
+        Title = isLocked and "🔒 Đã Khóa" or "🔓 Đã Mở",
+        Text = isLocked and "GUI sẽ không kéo được nữa." or "Có thể kéo GUI bình thường.",
+        Duration = 1.5,
+        Color = isLocked and "red" or "green",
+    })
+end))
+
+-- ĐÃ XÓA MinimizeBtn (V13.2)
+
+local HelpBtn = Instance.new("TextButton")
+HelpBtn.Size = UDim2.new(0, 34, 0, 34); HelpBtn.Position = UDim2.new(1, -78, 0, 6)
+HelpBtn.BackgroundTransparency = 1; HelpBtn.Text = "?"
+HelpBtn.TextColor3 = Color3.fromRGB(180, 185, 200); HelpBtn.TextSize = 17
+HelpBtn.Font = Enum.Font.GothamBold; HelpBtn.Parent = Topbar
+
+local KeybindBtn = Instance.new("TextButton")
+KeybindBtn.Size = UDim2.new(0, 34, 0, 34); KeybindBtn.Position = UDim2.new(1, -114, 0, 6)
+KeybindBtn.BackgroundTransparency = 1; KeybindBtn.Text = "⌨"
+KeybindBtn.TextColor3 = Color3.fromRGB(180, 185, 200); KeybindBtn.TextSize = 17
+KeybindBtn.Font = Enum.Font.GothamBold; KeybindBtn.Parent = Topbar
+
+local OpenBtnFrame = Instance.new("TextButton")
+OpenBtnFrame.Size = UDim2.new(0, 120, 0, 32); OpenBtnFrame.Position = UDim2.new(0.5, -60, 0, 8)
+OpenBtnFrame.BackgroundColor3 = Color3.fromRGB(22, 25, 34); OpenBtnFrame.BackgroundTransparency = 0.35
+OpenBtnFrame.Text = "⚡ Mở GUI"; OpenBtnFrame.TextColor3 = themeColor
+OpenBtnFrame.Font = Enum.Font.GothamBold; OpenBtnFrame.TextSize = 13
+OpenBtnFrame.Visible = false; OpenBtnFrame.Parent = ScreenGui
+local OBC = Instance.new("UICorner"); OBC.CornerRadius = UDim.new(0, 16); OBC.Parent = OpenBtnFrame
+if enableStroke then
+    local OBS = Instance.new("UIStroke"); OBS.Color = themeColor; OBS.Transparency = 0.4; OBS.Thickness = 1; OBS.Parent = OpenBtnFrame
+end
+registerTheme(OpenBtnFrame, "TextColor3")
+
+task.spawn(function()
+    while OpenBtnFrame.Parent do
+        TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.55}):Play()
+        task.wait(0.7)
+        if not OpenBtnFrame.Parent then break end
+        TweenService:Create(OpenBtnFrame, TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.25}):Play()
+        task.wait(0.7)
+    end
+end)
+
+Track(CloseBtn.MouseButton1Click:Connect(function()
+    savedBlurState = Window:IsBlurEnabled()
+    savedParticleState = Window:IsParticlesEnabled()
+    Window:SetBlur(false)
+    Window:SetParticles(false)
+    TweenService:Create(mainScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
+    task.wait(0.25)
+    MainFrame.Visible = false
+    mainScale.Scale = 1
+    OpenBtnFrame.Visible = true
+end))
+
+Track(OpenBtnFrame.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    OpenBtnFrame.Visible = false
+    mainScale.Scale = 0.85
+    TweenService:Create(mainScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+    if savedBlurState then Window:SetBlur(true) end
+    if savedParticleState then Window:SetParticles(true) end
+end))
+
+local currentToggleKey = config.ToggleKey or Enum.KeyCode.RightControl
+Track(HelpBtn.MouseButton1Click:Connect(function()
+    Window:Notify({
+        Title = "Hướng Dẫn",
+        Text = "• Kéo GUI bằng cách nhấn giữ bất kỳ đâu.\n• 🔒 Khóa GUI (không kéo được).\n• RightControl ẩn/hiện.",
+        Duration = 5,
+    })
+end))
+Track(KeybindBtn.MouseButton1Click:Connect(function()
+    Window:Notify({ Title = "Phím Tắt", Text = "Ẩn/hiện GUI: " .. tostring(currentToggleKey.Name), Duration = 4 })
+end))
+
+Track(UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == currentToggleKey then
+        if MainFrame.Visible then
+            savedBlurState = Window:IsBlurEnabled()
+            savedParticleState = Window:IsParticlesEnabled()
+            Window:SetBlur(false)
+            Window:SetParticles(false)
+            MainFrame.Visible = false
+            OpenBtnFrame.Visible = true
         else
-            MinimizeBtn.Text = "↑"
-            MainFrame:TweenSize(UDim2.new(0.70, 0, 0.88, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Back, 0.35, true)
+            MainFrame.Visible = true
+            OpenBtnFrame.Visible = false
+            if savedBlurState then Window:SetBlur(true) end
+            if savedParticleState then Window:SetParticles(true) end
         end
-    end))
+    end
+end))
 
-    local currentToggleKey = config.ToggleKey or Enum.KeyCode.RightControl
-    Track(HelpBtn.MouseButton1Click:Connect(function()
-        Window:Notify({
-            Title = "Hướng Dẫn",
-            Text = "• Kéo topbar di chuyển GUI.\n• 🔒 Khóa GUI (không kéo được).\n• RightControl ẩn/hiện.",
-            Duration = 5,
-        })
-    end))
-    Track(KeybindBtn.MouseButton1Click:Connect(function()
-        Window:Notify({ Title = "Phím Tắt", Text = "Ẩn/hiện GUI: " .. tostring(currentToggleKey.Name), Duration = 4 })
-    end))
-
-    Track(UserInputService.InputBegan:Connect(function(input, gpe)
-        if not gpe and input.KeyCode == currentToggleKey then
-            if MainFrame.Visible then
-                savedBlurState = Window:IsBlurEnabled()
-                savedParticleState = Window:IsParticlesEnabled()
-                Window:SetBlur(false)
-                Window:SetParticles(false)
-                MainFrame.Visible = false
-                OpenBtnFrame.Visible = true
-            else
-                MainFrame.Visible = true
-                OpenBtnFrame.Visible = false
-                if savedBlurState then Window:SetBlur(true) end
-                if savedParticleState then Window:SetParticles(true) end
-            end
+-- ═══════════════════════════════════════════
+-- DRAG LOGIC MỚI (V13.2) - KÉO MỌI NƠI
+-- ═══════════════════════════════════════════
+local dragging, dragStart, startPos
+local function isDragBlocked(target)
+    local t = target
+    while t and t ~= MainFrame do
+        if t:IsA("TextBox") then return true end
+        local n = t.Name
+        if n == "SliderBar" or n == "DropdownOption" or n == "MultiDropdownOption" or n == "InputBox" or n == "ColorPickerBar" then
+            return true
         end
-    end))
+        t = t.Parent
+    end
+    return false
+end
 
-    local dragging, dragStart, startPos
-    Track(Topbar.InputBegan:Connect(function(input)
-        if isLocked then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
-        end
-    end))
-    Track(UserInputService.InputChanged:Connect(function(input)
-        if isLocked then dragging = false; return end
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end))
-    Track(Topbar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
-    end))
+Track(MainFrame.InputBegan:Connect(function(input)
+    if isLocked then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if isDragBlocked(input.Target) then return end
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end))
+Track(UserInputService.InputChanged:Connect(function(input)
+    if isLocked then dragging = false; return end
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end))
+Track(UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+end))
 
-    -- SIDEBAR
-    local Sidebar = Instance.new("ScrollingFrame")
-    Sidebar.Size = UDim2.new(0, 160, 1, showPlaytime and -86 or -58)
-    Sidebar.Position = UDim2.new(0, 10, 0, 54)
-    Sidebar.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
-    Sidebar.BorderSizePixel = 0
-    Sidebar.ScrollBarThickness = 2; Sidebar.ScrollBarImageColor3 = themeColor
-    Sidebar.Parent = MainFrame
-    local SbC = Instance.new("UICorner"); SbC.CornerRadius = UDim.new(0, cornerRadius); SbC.Parent = Sidebar
+-- SIDEBAR
+local Sidebar = Instance.new("ScrollingFrame")
+Sidebar.Size = UDim2.new(0, 160, 1, showPlaytime and -86 or -58)
+Sidebar.Position = UDim2.new(0, 10, 0, 54)
+Sidebar.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
+Sidebar.BorderSizePixel = 0
+Sidebar.ScrollBarThickness = 2; Sidebar.ScrollBarImageColor3 = themeColor
+Sidebar.Parent = MainFrame
+local SbC = Instance.new("UICorner"); SbC.CornerRadius = UDim.new(0, cornerRadius); SbC.Parent = Sidebar
+if enableStroke then
+    local SbS = Instance.new("UIStroke"); SbS.Color = strokeColor; SbS.Thickness = 1; SbS.Parent = Sidebar
+end
+
+local TabListLayout = Instance.new("UIListLayout")
+TabListLayout.Padding = UDim.new(0, 6); TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+TabListLayout.Parent = Sidebar
+Track(TabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Sidebar.CanvasSize = UDim2.new(0, 0, 0, TabListLayout.AbsoluteContentSize.Y + 10)
+end))
+
+local ActiveIndicator = Instance.new("Frame")
+ActiveIndicator.Size = UDim2.new(0, 3, 0, 20)
+ActiveIndicator.Position = UDim2.new(0, 0, 0, 8)
+ActiveIndicator.BackgroundColor3 = themeColor
+ActiveIndicator.BorderSizePixel = 0
+ActiveIndicator.ZIndex = 3
+ActiveIndicator.Parent = Sidebar
+local AIC = Instance.new("UICorner"); AIC.CornerRadius = UDim.new(1, 0); AIC.Parent = ActiveIndicator
+registerTheme(ActiveIndicator, "BackgroundColor3")
+
+if showPlaytime then
+    local PlaytimeFrame = Instance.new("Frame")
+    PlaytimeFrame.Size = UDim2.new(0, 160, 0, 24); PlaytimeFrame.Position = UDim2.new(0, 10, 1, -28)
+    PlaytimeFrame.BackgroundColor3 = Color3.fromRGB(19, 21, 28); PlaytimeFrame.BorderSizePixel = 0
+    PlaytimeFrame.Parent = MainFrame
+    local PTC = Instance.new("UICorner"); PTC.CornerRadius = UDim.new(0, cornerRadius); PTC.Parent = PlaytimeFrame
     if enableStroke then
-        local SbS = Instance.new("UIStroke"); SbS.Color = strokeColor; SbS.Thickness = 1; SbS.Parent = Sidebar
+        local PTS = Instance.new("UIStroke"); PTS.Color = strokeColor; PTS.Thickness = 1; PTS.Parent = PlaytimeFrame
     end
-
-    local TabListLayout = Instance.new("UIListLayout")
-    TabListLayout.Padding = UDim.new(0, 6); TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    TabListLayout.Parent = Sidebar
-    Track(TabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        Sidebar.CanvasSize = UDim2.new(0, 0, 0, TabListLayout.AbsoluteContentSize.Y + 10)
-    end))
-
-    local ActiveIndicator = Instance.new("Frame")
-    ActiveIndicator.Size = UDim2.new(0, 3, 0, 20)
-    ActiveIndicator.Position = UDim2.new(0, 0, 0, 8)
-    ActiveIndicator.BackgroundColor3 = themeColor
-    ActiveIndicator.BorderSizePixel = 0
-    ActiveIndicator.ZIndex = 3
-    ActiveIndicator.Parent = Sidebar
-    local AIC = Instance.new("UICorner"); AIC.CornerRadius = UDim.new(1, 0); AIC.Parent = ActiveIndicator
-    registerTheme(ActiveIndicator, "BackgroundColor3")
-
-    if showPlaytime then
-        local PlaytimeFrame = Instance.new("Frame")
-        PlaytimeFrame.Size = UDim2.new(0, 160, 0, 24); PlaytimeFrame.Position = UDim2.new(0, 10, 1, -28)
-        PlaytimeFrame.BackgroundColor3 = Color3.fromRGB(19, 21, 28); PlaytimeFrame.BorderSizePixel = 0
-        PlaytimeFrame.Parent = MainFrame
-        local PTC = Instance.new("UICorner"); PTC.CornerRadius = UDim.new(0, cornerRadius); PTC.Parent = PlaytimeFrame
-        if enableStroke then
-            local PTS = Instance.new("UIStroke"); PTS.Color = strokeColor; PTS.Thickness = 1; PTS.Parent = PlaytimeFrame
+    local PlaytimeLabel = Instance.new("TextLabel")
+    PlaytimeLabel.Size = UDim2.new(1, 0, 1, 0); PlaytimeLabel.BackgroundTransparency = 1
+    PlaytimeLabel.Text = "⏱️ 00:00:00"
+    PlaytimeLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
+    PlaytimeLabel.Font = Enum.Font.Gotham; PlaytimeLabel.TextSize = 12
+    PlaytimeLabel.Parent = PlaytimeFrame
+    local startTime = os.time()
+    task.spawn(function()
+        while task.wait(1) do
+            if not ScreenGui.Parent then break end
+            local elapsed = os.time() - startTime
+            local hrs = math.floor(elapsed / 3600)
+            local mins = math.floor((elapsed % 3600) / 60)
+            local secs = elapsed % 60
+            PlaytimeLabel.Text = string.format("⏱️ %02d:%02d:%02d", hrs, mins, secs)
         end
-        local PlaytimeLabel = Instance.new("TextLabel")
-        PlaytimeLabel.Size = UDim2.new(1, 0, 1, 0); PlaytimeLabel.BackgroundTransparency = 1
-        PlaytimeLabel.Text = "⏱️ 00:00:00"
-        PlaytimeLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
-        PlaytimeLabel.Font = Enum.Font.Gotham; PlaytimeLabel.TextSize = 12
-        PlaytimeLabel.Parent = PlaytimeFrame
-        local startTime = os.time()
-        task.spawn(function()
-            while task.wait(1) do
-                if not ScreenGui.Parent then break end
-                local elapsed = os.time() - startTime
-                local hrs = math.floor(elapsed / 3600)
-                local mins = math.floor((elapsed % 3600) / 60)
-                local secs = elapsed % 60
-                PlaytimeLabel.Text = string.format("⏱️ %02d:%02d:%02d", hrs, mins, secs)
-            end
-        end)
-    end
+    end)
+end
 
-    local ContentArea = Instance.new("Frame")
-    ContentArea.Size = UDim2.new(1, -188, 1, -62)
-    ContentArea.Position = UDim2.new(0, 178, 0, 54)
-    ContentArea.BackgroundTransparency = 1
-    ContentArea.ClipsDescendants = true
-    ContentArea.Parent = MainFrame
+local ContentArea = Instance.new("Frame")
+ContentArea.Size = UDim2.new(1, -188, 1, -62)
+ContentArea.Position = UDim2.new(0, 178, 0, 54)
+ContentArea.BackgroundTransparency = 1
+ContentArea.ClipsDescendants = true
+ContentArea.Parent = MainFrame
 
-    local FirstTab = true
+local FirstTab = true
 
-    Track(SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local query = string.lower(SearchBox.Text)
-        for _, container in pairs(ContentArea:GetChildren()) do
-            if container:IsA("ScrollingFrame") and container.Visible then
-                for _, elem in pairs(container:GetChildren()) do
-                    local searchText = elem:GetAttribute("SearchText")
-                    if searchText then
-                        elem.Visible = (query == "" or string.find(searchText, query, 1, true) ~= nil)
-                    end
+Track(SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = string.lower(SearchBox.Text)
+    for _, container in pairs(ContentArea:GetChildren()) do
+        if container:IsA("ScrollingFrame") and container.Visible then
+            for _, elem in pairs(container:GetChildren()) do
+                local searchText = elem:GetAttribute("SearchText")
+                if searchText then
+                    elem.Visible = (query == "" or string.find(searchText, query, 1, true) ~= nil)
                 end
             end
         end
+    end
+end))
+
+-- NOTIFY
+local NotifContainer = Instance.new("Frame")
+NotifContainer.Size = UDim2.new(0, 250, 1, -20)
+NotifContainer.Position = UDim2.new(1, -260, 0, 10)
+NotifContainer.BackgroundTransparency = 1
+NotifContainer.Parent = ScreenGui
+local NotifLayout = Instance.new("UIListLayout")
+NotifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+NotifLayout.Padding = UDim.new(0, 6); NotifLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NotifLayout.Parent = NotifContainer
+
+function Window:Notify(notifConfig)
+    notifConfig = notifConfig or {}
+    local title    = notifConfig.Title or "Thông Báo"
+    local text     = notifConfig.Text or ""
+    local duration = notifConfig.Duration or 3
+    local nColor   = ParseColor(notifConfig.Color, Window.ThemeColor)
+    local pos      = notifConfig.Position
+
+    local Item = Instance.new("Frame")
+    Item.Size = UDim2.new(1, 0, 0, 54)
+    Item.BackgroundColor3 = Color3.fromRGB(22, 25, 34)
+    Item.BorderSizePixel = 0; Item.Parent = NotifContainer
+    local ICC = Instance.new("UICorner"); ICC.CornerRadius = UDim.new(0, cornerRadius); ICC.Parent = Item
+    if enableStroke then
+        local IS = Instance.new("UIStroke"); IS.Color = strokeColor; IS.Thickness = 1; IS.Parent = Item
+    end
+    local nScale = Instance.new("UIScale"); nScale.Scale = 0.7; nScale.Parent = Item
+    TweenService:Create(nScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
+    local Bar = Instance.new("Frame")
+    Bar.Size = UDim2.new(0, 4, 1, 0); Bar.BackgroundColor3 = nColor
+    Bar.BorderSizePixel = 0; Bar.Parent = Item
+    local BC2 = Instance.new("UICorner"); BC2.CornerRadius = UDim.new(0, cornerRadius); BC2.Parent = Bar
+
+    local NTitle = Instance.new("TextLabel")
+    NTitle.Size = UDim2.new(1, -12, 0, 20); NTitle.Position = UDim2.new(0, 12, 0, 4)
+    NTitle.BackgroundTransparency = 1; NTitle.Text = title
+    NTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    NTitle.Font = Enum.Font.GothamBold; NTitle.TextSize = 13
+    NTitle.TextXAlignment = Enum.TextXAlignment.Left
+    NTitle.Parent = Item
+
+    local NText = Instance.new("TextLabel")
+    NText.Size = UDim2.new(1, -12, 0, 22); NText.Position = UDim2.new(0, 12, 0, 24)
+    NText.BackgroundTransparency = 1; NText.Text = text
+    NText.TextColor3 = Color3.fromRGB(160, 165, 180)
+    NText.Font = Enum.Font.Gotham; NText.TextSize = 12
+    NText.TextXAlignment = Enum.TextXAlignment.Left
+    NText.Parent = Item
+
+    if pos == "left" then NotifContainer.Position = UDim2.new(0, 10, 0, 10)
+    elseif pos == "center" then NotifContainer.Position = UDim2.new(0.5, -125, 0, 10)
+    else NotifContainer.Position = UDim2.new(1, -260, 0, 10) end
+
+    task.spawn(function()
+        task.wait(duration)
+        TweenService:Create(nScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
+        TweenService:Create(Item, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(NTitle, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+        TweenService:Create(NText, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
+        TweenService:Create(Bar, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+        task.wait(0.3)
+        Item:Destroy()
+    end)
+end
+
+-- TOOLTIP
+local TooltipFrame = Instance.new("Frame")
+TooltipFrame.Size = UDim2.new(0, 200, 0, 28)
+TooltipFrame.BackgroundColor3 = Color3.fromRGB(30, 34, 46)
+TooltipFrame.BorderSizePixel = 0
+TooltipFrame.Visible = false
+TooltipFrame.ZIndex = 100
+TooltipFrame.Parent = ScreenGui
+local TTC = Instance.new("UICorner"); TTC.CornerRadius = UDim.new(0, 6); TTC.Parent = TooltipFrame
+if enableStroke then
+    local TTS = Instance.new("UIStroke"); TTS.Color = themeColor; TTS.Thickness = 1; TTS.Parent = TooltipFrame
+    registerTheme(TTS, "Color")
+end
+local TooltipLabel = Instance.new("TextLabel")
+TooltipLabel.Size = UDim2.new(1, -12, 1, 0); TooltipLabel.Position = UDim2.new(0, 6, 0, 0)
+TooltipLabel.BackgroundTransparency = 1
+TooltipLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+TooltipLabel.Font = Enum.Font.Gotham; TooltipLabel.TextSize = 12
+TooltipLabel.TextXAlignment = Enum.TextXAlignment.Left
+TooltipLabel.Parent = TooltipFrame
+
+local function AddTooltip(widget, text)
+    if not text or text == "" then return end
+    Track(widget.MouseEnter:Connect(function()
+        TooltipLabel.Text = text
+        local w = math.clamp(#text * 7 + 20, 100, 260)
+        TooltipFrame.Size = UDim2.new(0, w, 0, 28)
+        TooltipFrame.Position = UDim2.new(0, widget.AbsolutePosition.X + widget.AbsoluteSize.X + 10, 0, widget.AbsolutePosition.Y + widget.AbsoluteSize.Y/2 - 14)
+        TooltipFrame.Visible = true
     end))
+    Track(widget.MouseLeave:Connect(function()
+        TooltipFrame.Visible = false
+    end))
+end
 
-    -- NOTIFY
-    local NotifContainer = Instance.new("Frame")
-    NotifContainer.Size = UDim2.new(0, 250, 1, -20)
-    NotifContainer.Position = UDim2.new(1, -260, 0, 10)
-    NotifContainer.BackgroundTransparency = 1
-    NotifContainer.Parent = ScreenGui
-    local NotifLayout = Instance.new("UIListLayout")
-    NotifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-    NotifLayout.Padding = UDim.new(0, 6); NotifLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    NotifLayout.Parent = NotifContainer
+-- PRESET
+function Window:SavePreset(name)
+    if not name or name == "" then return false end
+    if not savedData["_Presets"] then savedData["_Presets"] = {} end
+    local snapshot = {}
+    for k, v in pairs(savedData) do
+        if k ~= "_Presets" and k ~= "_SavedKey" then snapshot[k] = v end
+    end
+    savedData["_Presets"][name] = snapshot
+    SaveCurrentConfig()
+    return true
+end
 
-    function Window:Notify(notifConfig)
-        notifConfig = notifConfig or {}
-        local title    = notifConfig.Title or "Thông Báo"
-        local text     = notifConfig.Text or ""
-        local duration = notifConfig.Duration or 3
-        local nColor   = ParseColor(notifConfig.Color, Window.ThemeColor)
-        local pos      = notifConfig.Position
+function Window:LoadPreset(name)
+    if not savedData["_Presets"] or not savedData["_Presets"][name] then return false end
+    local snapshot = savedData["_Presets"][name]
+    for k, v in pairs(snapshot) do savedData[k] = v end
+    SaveCurrentConfig()
+    for _, fn in ipairs(presetAppliers) do pcall(fn) end
+    return true
+end
 
-        local Item = Instance.new("Frame")
-        Item.Size = UDim2.new(1, 0, 0, 54)
-        Item.BackgroundColor3 = Color3.fromRGB(22, 25, 34)
-        Item.BorderSizePixel = 0; Item.Parent = NotifContainer
-        local ICC = Instance.new("UICorner"); ICC.CornerRadius = UDim.new(0, cornerRadius); ICC.Parent = Item
-        if enableStroke then
-            local IS = Instance.new("UIStroke"); IS.Color = strokeColor; IS.Thickness = 1; IS.Parent = Item
-        end
-        local nScale = Instance.new("UIScale"); nScale.Scale = 0.7; nScale.Parent = Item
-        TweenService:Create(nScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+function Window:GetPresets()
+    local list = {}
+    if savedData["_Presets"] then
+        for name, _ in pairs(savedData["_Presets"]) do table.insert(list, name) end
+    end
+    return list
+end
 
-        local Bar = Instance.new("Frame")
-        Bar.Size = UDim2.new(0, 4, 1, 0); Bar.BackgroundColor3 = nColor
-        Bar.BorderSizePixel = 0; Bar.Parent = Item
-        local BC2 = Instance.new("UICorner"); BC2.CornerRadius = UDim.new(0, cornerRadius); BC2.Parent = Bar
+function Window:DeletePreset(name)
+    if savedData["_Presets"] and savedData["_Presets"][name] then
+        savedData["_Presets"][name] = nil
+        SaveCurrentConfig()
+        return true
+    end
+    return false
+end
 
-        local NTitle = Instance.new("TextLabel")
-        NTitle.Size = UDim2.new(1, -12, 0, 20); NTitle.Position = UDim2.new(0, 12, 0, 4)
-        NTitle.BackgroundTransparency = 1; NTitle.Text = title
-        NTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-        NTitle.Font = Enum.Font.GothamBold; NTitle.TextSize = 13
-        NTitle.TextXAlignment = Enum.TextXAlignment.Left
-        NTitle.Parent = Item
-
-        local NText = Instance.new("TextLabel")
-        NText.Size = UDim2.new(1, -12, 0, 22); NText.Position = UDim2.new(0, 12, 0, 24)
-        NText.BackgroundTransparency = 1; NText.Text = text
-        NText.TextColor3 = Color3.fromRGB(160, 165, 180)
-        NText.Font = Enum.Font.Gotham; NText.TextSize = 12
-        NText.TextXAlignment = Enum.TextXAlignment.Left
-        NText.Parent = Item
-
-        if pos == "left" then NotifContainer.Position = UDim2.new(0, 10, 0, 10)
-        elseif pos == "center" then NotifContainer.Position = UDim2.new(0.5, -125, 0, 10)
-        else NotifContainer.Position = UDim2.new(1, -260, 0, 10) end
-
-        task.spawn(function()
-            task.wait(duration)
-            TweenService:Create(nScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
-            TweenService:Create(Item, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-            TweenService:Create(NTitle, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
-            TweenService:Create(NText, TweenInfo.new(0.3), {TextTransparency = 1}):Play()
-            TweenService:Create(Bar, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-            task.wait(0.3)
-            Item:Destroy()
+-- THEME SWITCHER
+function Window:SetTheme(newColor)
+    local c = ParseColor(newColor, ColorPresets.blue)
+    themeColor = c
+    Window.ThemeColor = c
+    Sidebar.ScrollBarImageColor3 = c
+    for _, entry in ipairs(themeTargets) do
+        pcall(function()
+            TweenService:Create(entry.obj, TweenInfo.new(0.35, Enum.EasingStyle.Quart), {[entry.prop] = c}):Play()
         end)
     end
-
-    -- TOOLTIP
-    local TooltipFrame = Instance.new("Frame")
-    TooltipFrame.Size = UDim2.new(0, 200, 0, 28)
-    TooltipFrame.BackgroundColor3 = Color3.fromRGB(30, 34, 46)
-    TooltipFrame.BorderSizePixel = 0
-    TooltipFrame.Visible = false
-    TooltipFrame.ZIndex = 100
-    TooltipFrame.Parent = ScreenGui
-    local TTC = Instance.new("UICorner"); TTC.CornerRadius = UDim.new(0, 6); TTC.Parent = TooltipFrame
-    if enableStroke then
-        local TTS = Instance.new("UIStroke"); TTS.Color = themeColor; TTS.Thickness = 1; TTS.Parent = TooltipFrame
-        registerTheme(TTS, "Color")
-    end
-    local TooltipLabel = Instance.new("TextLabel")
-    TooltipLabel.Size = UDim2.new(1, -12, 1, 0); TooltipLabel.Position = UDim2.new(0, 6, 0, 0)
-    TooltipLabel.BackgroundTransparency = 1
-    TooltipLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
-    TooltipLabel.Font = Enum.Font.Gotham; TooltipLabel.TextSize = 12
-    TooltipLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TooltipLabel.Parent = TooltipFrame
-
-    local function AddTooltip(widget, text)
-        if not text or text == "" then return end
-        Track(widget.MouseEnter:Connect(function()
-            TooltipLabel.Text = text
-            local w = math.clamp(#text * 7 + 20, 100, 260)
-            TooltipFrame.Size = UDim2.new(0, w, 0, 28)
-            TooltipFrame.Position = UDim2.new(0, widget.AbsolutePosition.X + widget.AbsoluteSize.X + 10, 0, widget.AbsolutePosition.Y + widget.AbsoluteSize.Y/2 - 14)
-            TooltipFrame.Visible = true
-        end))
-        Track(widget.MouseLeave:Connect(function()
-            TooltipFrame.Visible = false
-        end))
-    end
-
-    -- PRESET
-    function Window:SavePreset(name)
-        if not name or name == "" then return false end
-        if not savedData["_Presets"] then savedData["_Presets"] = {} end
-        local snapshot = {}
-        for k, v in pairs(savedData) do
-            if k ~= "_Presets" and k ~= "_SavedKey" then snapshot[k] = v end
-        end
-        savedData["_Presets"][name] = snapshot
+    TitleLabel.Text = hubTitle .. (hubVersion ~= "" and ("  <font color=\"" .. hexStringOf(c) .. "\">" .. hubVersion .. "</font>") or "")
+    if savedData then
+        savedData["_SavedTheme"] = tostring(c)
         SaveCurrentConfig()
-        return true
     end
+end
 
-    function Window:LoadPreset(name)
-        if not savedData["_Presets"] or not savedData["_Presets"][name] then return false end
-        local snapshot = savedData["_Presets"][name]
-        for k, v in pairs(snapshot) do savedData[k] = v end
-        SaveCurrentConfig()
-        for _, fn in ipairs(presetAppliers) do pcall(fn) end
-        return true
-    end
-
-    function Window:GetPresets()
-        local list = {}
-        if savedData["_Presets"] then
-            for name, _ in pairs(savedData["_Presets"]) do table.insert(list, name) end
-        end
-        return list
-    end
-
-    function Window:DeletePreset(name)
-        if savedData["_Presets"] and savedData["_Presets"][name] then
-            savedData["_Presets"][name] = nil
-            SaveCurrentConfig()
-            return true
-        end
-        return false
-    end
-
-    -- THEME SWITCHER
-    function Window:SetTheme(newColor)
-        local c = ParseColor(newColor, ColorPresets.blue)
-        themeColor = c
-        Window.ThemeColor = c
-        Sidebar.ScrollBarImageColor3 = c
-        for _, entry in ipairs(themeTargets) do
-            pcall(function()
-                TweenService:Create(entry.obj, TweenInfo.new(0.35, Enum.EasingStyle.Quart), {[entry.prop] = c}):Play()
-            end)
-        end
-        TitleLabel.Text = hubTitle .. (hubVersion ~= "" and ("  <font color=\"" .. hexStringOf(c) .. "\">" .. hubVersion .. "</font>") or "")
-        if savedData then
-            savedData["_SavedTheme"] = tostring(c)
-            SaveCurrentConfig()
-        end
-    end
-
-    function Window:GetTheme() return themeColor end
-
+function Window:GetTheme() return themeColor end
     -- WIDGET BUILDER
     local function buildWidgets(container)
         local W = {}
@@ -1055,6 +1058,7 @@ function AlatferaLib.CreateWindow(config)
             VB.Font = Enum.Font.GothamBold; VB.TextSize = 12
             VB.TextEditable = showInput
             VB.ClearTextOnFocus = false
+            VB.Name = "InputBox"
             VB.Parent = SF
             local VBC = Instance.new("UICorner"); VBC.CornerRadius = UDim.new(0, 6); VBC.Parent = VB
             registerTheme(VB, "TextColor3")
@@ -1066,6 +1070,7 @@ function AlatferaLib.CreateWindow(config)
             Bar.Size = UDim2.new(1, -28, 0, 7); Bar.Position = UDim2.new(0, 14, 0, 30)
             Bar.BackgroundColor3 = Color3.fromRGB(50, 56, 72)
             Bar.Text = ""; Bar.AutoButtonColor = false
+            Bar.Name = "SliderBar"
             Bar.Parent = SF
             local SBC = Instance.new("UICorner"); SBC.CornerRadius = UDim.new(1, 0); SBC.Parent = Bar
             local Fill = Instance.new("Frame")
@@ -1211,6 +1216,7 @@ function AlatferaLib.CreateWindow(config)
                 OB.Text = opt
                 OB.TextColor3 = Color3.fromRGB(200, 205, 220)
                 OB.Font = Enum.Font.Gotham; OB.TextSize = 12
+                OB.Name = "DropdownOption"
                 OB.Parent = OC
                 local OBC = Instance.new("UICorner"); OBC.CornerRadius = UDim.new(0, cornerRadius - 2); OBC.Parent = OB
                 Track(OB.MouseEnter:Connect(function()
@@ -1298,6 +1304,7 @@ function AlatferaLib.CreateWindow(config)
                 OB.Size = UDim2.new(1, 0, 0, 26)
                 OB.BackgroundColor3 = selected[opt] and Color3.fromRGB(30, 36, 48) or Color3.fromRGB(18, 20, 26)
                 OB.Text = ""; OB.AutoButtonColor = false
+                OB.Name = "MultiDropdownOption"
                 OB.Parent = OC
                 local OBC = Instance.new("UICorner"); OBC.CornerRadius = UDim.new(0, cornerRadius - 2); OBC.Parent = OB
                 local CB = Instance.new("Frame")
@@ -1415,6 +1422,7 @@ function AlatferaLib.CreateWindow(config)
                 Bar.Size = UDim2.new(1, -90, 0, 8); Bar.Position = UDim2.new(0, 45, 0.5, -4)
                 Bar.BackgroundColor3 = Color3.fromRGB(50, 56, 72)
                 Bar.Text = ""; Bar.AutoButtonColor = false
+                Bar.Name = "ColorPickerBar"
                 Bar.Parent = Row
                 local BC3 = Instance.new("UICorner"); BC3.CornerRadius = UDim.new(1, 0); BC3.Parent = Bar
                 local Fill = Instance.new("Frame")
@@ -1536,6 +1544,7 @@ function AlatferaLib.CreateWindow(config)
             IB.TextColor3 = Color3.fromRGB(255, 255, 255)
             IB.PlaceholderColor3 = Color3.fromRGB(120, 125, 140)
             IB.Font = Enum.Font.Gotham; IB.TextSize = 12
+            IB.Name = "InputBox"
             IB.Parent = BF
             local IBC = Instance.new("UICorner"); IBC.CornerRadius = UDim.new(0, cornerRadius - 2); IBC.Parent = IB
             Track(IB.Focused:Connect(function()
@@ -1806,9 +1815,7 @@ function AlatferaLib.CreateWindow(config)
         return Tab
     end
 
-    -- ═══════════════════════════════════════════
-    -- MINI WINDOW - GUI PHỤ TRÔI NỔI
-    -- ═══════════════════════════════════════════
+    -- MINI WINDOW
     function Window:CreateMiniWindow(mwConfig)
         mwConfig = mwConfig or {}
         local mwX = mwConfig.X or 20
