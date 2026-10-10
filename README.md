@@ -2023,7 +2023,312 @@ function AlatferaLib.CreateWindow(config)
         return particleContainer ~= nil and particleContainer.Parent ~= nil
     end
 
-    function Window:Destroy()
+    function Window:Destroy()-- ═══════════════════════════════════════════
+-- MINI WINDOW - GUI PHỤ TRÔI NỔI (V13.1)
+-- ═══════════════════════════════════════════
+function Window:CreateMiniWindow(mwConfig)
+    mwConfig = mwConfig or {}
+    local mwX = mwConfig.X or 20
+    local mwY = mwConfig.Y or 100
+    local mwWidth = mwConfig.Width or 150
+    local mwHeight = mwConfig.Height or 220
+    local mwResizable = (mwConfig.Resizable == nil) and true or mwConfig.Resizable
+    local mwDraggable = (mwConfig.Draggable == nil) and true or mwConfig.Draggable
+    local mwMinW = mwConfig.MinWidth or 120
+    local mwMaxW = mwConfig.MaxWidth or 400
+    local mwMinH = mwConfig.MinHeight or 80
+    local mwMaxH = mwConfig.MaxHeight or 500
+    local mwShowDragBar = (mwConfig.ShowDragBar == nil) and true or mwConfig.ShowDragBar
+
+    local MiniFrame = Instance.new("Frame")
+    MiniFrame.Name = "MiniWindow"
+    MiniFrame.Size = UDim2.new(0, mwWidth, 0, mwHeight)
+    MiniFrame.Position = UDim2.new(0, mwX, 0, mwY)
+    MiniFrame.BackgroundTransparency = 1
+    MiniFrame.BorderSizePixel = 0
+    MiniFrame.ClipsDescendants = false
+    MiniFrame.Parent = ScreenGui
+
+    local Container = Instance.new("ScrollingFrame")
+    Container.Size = UDim2.new(1, 0, 1, mwShowDragBar and -20 or 0)
+    Container.Position = UDim2.new(0, 0, 0, mwShowDragBar and 20 or 0)
+    Container.BackgroundTransparency = 1
+    Container.BorderSizePixel = 0
+    Container.ScrollBarThickness = 2
+    Container.ScrollBarImageColor3 = themeColor
+    Container.Parent = MiniFrame
+
+    local Layout = Instance.new("UIListLayout")
+    Layout.Padding = UDim.new(0, 4)
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder
+    Layout.Parent = Container
+    Track(Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Container.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 10)
+    end))
+
+    local DragBar = Instance.new("TextButton")
+    DragBar.Size = UDim2.new(1, 0, 0, 18)
+    DragBar.Position = UDim2.new(0, 0, 0, 0)
+    DragBar.BackgroundColor3 = Color3.fromRGB(25, 28, 38)
+    DragBar.BackgroundTransparency = 0.25
+    DragBar.Text = "✥  Kéo"
+    DragBar.TextColor3 = Color3.fromRGB(180, 185, 200)
+    DragBar.TextSize = 11
+    DragBar.Font = Enum.Font.Gotham
+    DragBar.Visible = mwShowDragBar
+    DragBar.Parent = MiniFrame
+    local DBC = Instance.new("UICorner"); DBC.CornerRadius = UDim.new(0, 6); DBC.Parent = DragBar
+
+    local ResizeHandle = Instance.new("TextButton")
+    ResizeHandle.Size = UDim2.new(0, 16, 0, 16)
+    ResizeHandle.Position = UDim2.new(1, -16, 1, -16)
+    ResizeHandle.BackgroundColor3 = themeColor
+    ResizeHandle.BackgroundTransparency = 0.3
+    ResizeHandle.Text = "◢"
+    ResizeHandle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ResizeHandle.TextSize = 12
+    ResizeHandle.Font = Enum.Font.GothamBold
+    ResizeHandle.Visible = mwResizable
+    ResizeHandle.Parent = MiniFrame
+    local RHC = Instance.new("UICorner"); RHC.CornerRadius = UDim.new(0, 4); RHC.Parent = ResizeHandle
+    registerTheme(ResizeHandle, "BackgroundColor3")
+
+    if mwDraggable then
+        local dg, ds, sp
+        Track(DragBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dg = true; ds = input.Position; sp = MiniFrame.Position
+            end
+        end))
+        Track(UserInputService.InputChanged:Connect(function(input)
+            if dg and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - ds
+                MiniFrame.Position = UDim2.new(0, sp.X.Offset + delta.X, 0, sp.Y.Offset + delta.Y)
+            end
+        end))
+        Track(UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dg = false end
+        end))
+    end
+
+    if mwResizable then
+        local rg, rs, rsize
+        Track(ResizeHandle.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                rg = true; rs = input.Position; rsize = MiniFrame.AbsoluteSize
+            end
+        end))
+        Track(UserInputService.InputChanged:Connect(function(input)
+            if rg and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - rs
+                local newW = math.clamp(rsize.X + delta.X, mwMinW, mwMaxW)
+                local newH = math.clamp(rsize.Y + delta.Y, mwMinH, mwMaxH)
+                MiniFrame.Size = UDim2.new(0, newW, 0, newH)
+            end
+        end))
+        Track(UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then rg = false end
+        end))
+    end
+
+    local MW = {}
+
+    function MW:CreateLabel(text, tooltip)
+        local L = Instance.new("TextLabel")
+        L.Size = UDim2.new(1, -4, 0, 22)
+        L.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+        L.BackgroundTransparency = 0.15
+        L.Text = text
+        L.TextColor3 = Color3.fromRGB(240, 240, 245)
+        L.Font = Enum.Font.Gotham
+        L.TextSize = 12
+        L.Parent = Container
+        local LC = Instance.new("UICorner"); LC.CornerRadius = UDim.new(0, 6); LC.Parent = L
+        AddTooltip(L, tooltip or text)
+        return L
+    end
+
+    function MW:CreateButton(text, callback, tooltip)
+        callback = callback or function() end
+        local B = Instance.new("TextButton")
+        B.Size = UDim2.new(1, -4, 0, 26)
+        B.BackgroundColor3 = themeColor
+        B.BackgroundTransparency = 0.1
+        B.Text = text
+        B.TextColor3 = Color3.fromRGB(255, 255, 255)
+        B.Font = Enum.Font.GothamBold
+        B.TextSize = 12
+        B.Parent = Container
+        local BC = Instance.new("UICorner"); BC.CornerRadius = UDim.new(0, 6); BC.Parent = B
+        AddTooltip(B, tooltip)
+        registerTheme(B, "BackgroundColor3")
+        Track(B.MouseButton1Click:Connect(function() callback() end))
+        return B
+    end
+
+    function MW:CreateToggle(text, flagName, defaultState, callback, tooltip)
+        callback = callback or function() end
+        if flagName and savedData[flagName] ~= nil then defaultState = savedData[flagName] end
+        local state = defaultState or false
+        local T = Instance.new("TextButton")
+        T.Size = UDim2.new(1, -4, 0, 26)
+        T.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+        T.BackgroundTransparency = 0.15
+        T.Text = ""
+        T.Parent = Container
+        local TC = Instance.new("UICorner"); TC.CornerRadius = UDim.new(0, 6); TC.Parent = T
+        AddTooltip(T, tooltip or text)
+        local Lbl = Instance.new("TextLabel")
+        Lbl.Size = UDim2.new(1, -40, 1, 0)
+        Lbl.Position = UDim2.new(0, 8, 0, 0)
+        Lbl.BackgroundTransparency = 1
+        Lbl.Text = text
+        Lbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+        Lbl.TextXAlignment = Enum.TextXAlignment.Left
+        Lbl.Font = Enum.Font.Gotham
+        Lbl.TextSize = 11
+        Lbl.Parent = T
+        local Tr = Instance.new("Frame")
+        Tr.Size = UDim2.new(0, 30, 0, 16)
+        Tr.Position = UDim2.new(1, -36, 0.5, -8)
+        Tr.BackgroundColor3 = state and themeColor or Color3.fromRGB(50, 56, 72)
+        Tr.BorderSizePixel = 0
+        Tr.Parent = T
+        local TrC = Instance.new("UICorner"); TrC.CornerRadius = UDim.new(1, 0); TrC.Parent = Tr
+        local K = Instance.new("Frame")
+        K.Size = UDim2.new(0, 12, 0, 12)
+        K.Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
+        K.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        K.BorderSizePixel = 0
+        K.Parent = Tr
+        local KC = Instance.new("UICorner"); KC.CornerRadius = UDim.new(1, 0); KC.Parent = K
+        Track(T.MouseButton1Click:Connect(function()
+            state = not state
+            TweenService:Create(Tr, TweenInfo.new(0.2), {BackgroundColor3 = state and Window.ThemeColor or Color3.fromRGB(50, 56, 72)}):Play()
+            TweenService:Create(K, TweenInfo.new(0.2, Enum.EasingStyle.Back), {Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)}):Play()
+            if flagName then savedData[flagName] = state; SaveCurrentConfig() end
+            callback(state)
+        end))
+        return T
+    end
+
+    function MW:CreateSlider(text, flagName, minV, maxV, defaultV, callback, tooltip)
+        callback = callback or function() end
+        minV = minV or 0; maxV = maxV or 100
+        if flagName and savedData[flagName] ~= nil then defaultV = savedData[flagName] end
+        defaultV = math.clamp(defaultV or minV, minV, maxV)
+        local S = Instance.new("Frame")
+        S.Size = UDim2.new(1, -4, 0, 34)
+        S.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+        S.BackgroundTransparency = 0.15
+        S.Parent = Container
+        local SC = Instance.new("UICorner"); SC.CornerRadius = UDim.new(0, 6); SC.Parent = S
+        AddTooltip(S, tooltip or text)
+        local Lbl = Instance.new("TextLabel")
+        Lbl.Size = UDim2.new(1, -40, 0, 16)
+        Lbl.Position = UDim2.new(0, 8, 0, 2)
+        Lbl.BackgroundTransparency = 1
+        Lbl.Text = text
+        Lbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+        Lbl.TextXAlignment = Enum.TextXAlignment.Left
+        Lbl.Font = Enum.Font.Gotham
+        Lbl.TextSize = 10
+        Lbl.Parent = S
+        local Val = Instance.new("TextLabel")
+        Val.Size = UDim2.new(0, 40, 0, 16)
+        Val.Position = UDim2.new(1, -40, 0, 2)
+        Val.BackgroundTransparency = 1
+        Val.Text = tostring(defaultV)
+        Val.TextColor3 = themeColor
+        Val.TextXAlignment = Enum.TextXAlignment.Right
+        Val.Font = Enum.Font.GothamBold
+        Val.TextSize = 10
+        Val.Parent = S
+        registerTheme(Val, "TextColor3")
+        local Bar = Instance.new("TextButton")
+        Bar.Size = UDim2.new(1, -16, 0, 5)
+        Bar.Position = UDim2.new(0, 8, 0, 22)
+        Bar.BackgroundColor3 = Color3.fromRGB(50, 56, 72)
+        Bar.Text = ""
+        Bar.AutoButtonColor = false
+        Bar.Parent = S
+        local BC = Instance.new("UICorner"); BC.CornerRadius = UDim.new(1, 0); BC.Parent = Bar
+        local Fill = Instance.new("Frame")
+        local pct = (defaultV - minV) / (maxV - minV)
+        Fill.Size = UDim2.new(pct, 0, 1, 0)
+        Fill.BackgroundColor3 = themeColor
+        Fill.BorderSizePixel = 0
+        Fill.Parent = Bar
+        local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(1, 0); FC.Parent = Fill
+        registerTheme(Fill, "BackgroundColor3")
+        local sliding = false
+        local function upd(input)
+            local p = math.clamp((input.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
+            local v = math.floor(minV + (maxV - minV) * p)
+            Fill.Size = UDim2.new(p, 0, 1, 0)
+            Val.Text = tostring(v)
+            if flagName then savedData[flagName] = v; SaveCurrentConfig() end
+            callback(v)
+        end
+        Track(Bar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                sliding = true; upd(input)
+            end
+        end))
+        Track(UserInputService.InputChanged:Connect(function(input)
+            if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                upd(input)
+            end
+        end))
+        Track(UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then sliding = false end
+        end))
+        return S
+    end
+
+    function MW:CreateImage(imageId, height)
+        if not imageId then return nil end
+        local h = height or 60
+        local F = Instance.new("Frame")
+        F.Size = UDim2.new(1, -4, 0, h)
+        F.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+        F.BackgroundTransparency = 0.15
+        F.ClipsDescendants = true
+        F.Parent = Container
+        local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(0, 6); FC.Parent = F
+        local Img = Instance.new("ImageLabel")
+        Img.Size = UDim2.new(1, -8, 1, -8)
+        Img.Position = UDim2.new(0, 4, 0, 4)
+        Img.BackgroundTransparency = 1
+        Img.Image = typeof(imageId) == "number" and ("rbxassetid://" .. imageId) or imageId
+        Img.ScaleType = Enum.ScaleType.Fit
+        Img.Parent = F
+        return F
+    end
+
+    function MW:SetPosition(x, y) MiniFrame.Position = UDim2.new(0, x, 0, y) end
+    function MW:SetSize(w, h)
+        MiniFrame.Size = UDim2.new(0, math.clamp(w, mwMinW, mwMaxW), 0, math.clamp(h, mwMinH, mwMaxH))
+    end
+    function MW:GetSize() return MiniFrame.AbsoluteSize end
+    function MW:SetDraggable(bool) mwDraggable = bool; DragBar.Visible = bool end
+    function MW:SetResizable(bool) mwResizable = bool; ResizeHandle.Visible = bool end
+    function MW:SetDragBarVisible(bool)
+        mwShowDragBar = bool
+        DragBar.Visible = bool
+        Container.Position = UDim2.new(0, 0, 0, bool and 20 or 0)
+        Container.Size = UDim2.new(1, 0, 1, bool and -20 or 0)
+    end
+    function MW:Show() MiniFrame.Visible = true end
+    function MW:Hide() MiniFrame.Visible = false end
+    function MW:IsVisible() return MiniFrame.Visible end
+    function MW:ToggleVisible() MiniFrame.Visible = not MiniFrame.Visible end
+    function MW:Destroy() MiniFrame:Destroy() end
+    function MW:GetFrame() return MiniFrame end
+
+    return MW
+end
+ 
         TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
         task.wait(0.3)
         for _, conn in ipairs(connections) do
