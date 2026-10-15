@@ -59,6 +59,178 @@ local function GetFromClipboard()
     return ""
 end
 
+-- ============ CONFIG CODE: mã hóa + chống sửa + hết hạn ============
+-- Code chỉ gồm chữ, số và 4 ký hiệu ( ) ! ?
+local CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?"
+local CODE_DECODE = {}
+for i = 1, #CODE_ALPHABET do CODE_DECODE[CODE_ALPHABET:sub(i, i)] = i - 1 end
+local MOD32 = 4294967296
+local CODE_MAX_LEN = 20000
+
+local function mul32(a, b)
+    local hi = bit32.rshift(b, 16)
+    local lo = bit32.band(b, 0xFFFF)
+    return (((a * hi) % MOD32) * 65536 + a * lo) % MOD32
+end
+
+local function hash32(str, seed)
+    local h = seed
+    for i = 1, #str do
+        h = bit32.bxor(h, str:byte(i))
+        h = mul32(h, 16777619)
+    end
+    h = bit32.bxor(h, bit32.rshift(h, 15))
+    h = mul32(h, 2246822519)
+    h = bit32.bxor(h, bit32.rshift(h, 13))
+    h = mul32(h, 3266489917)
+    h = bit32.bxor(h, bit32.rshift(h, 16))
+    return h
+end
+
+local function u32bytes(h)
+    return string.char(
+        bit32.rshift(h, 24),
+        bit32.band(bit32.rshift(h, 16), 255),
+        bit32.band(bit32.rshift(h, 8), 255),
+        bit32.band(h, 255)
+    )
+end
+
+local function macOf(secret, data)
+    local h1 = hash32(secret .. "\1" .. data .. "\2" .. secret, 2166136261)
+    local h2 = hash32(string.reverse(data) .. "\3" .. secret, 374761393)
+    return u32bytes(h1) .. u32bytes(h2)
+end
+
+local function xorStream(secret, nonce, data)
+    local state = hash32(secret .. nonce, 2654435761)
+    local t = {}
+    for i = 1, #data do
+        state = (mul32(state, 1664525) + 1013904223) % MOD32
+        t[i] = string.char(bit32.bxor(data:byte(i), bit32.band(bit32.rshift(state, 16), 255)))
+    end
+    return table.concat(t)
+end
+
+local function randomBytes(n)
+    local t = {}
+    for i = 1, n do t[i] = string.char(math.random(0, 255)) end
+    return table.concat(t)
+end
+
+local function bytesToCode(s)
+    local out = {}
+    for i = 1, #s, 3 do
+        local a, b, c = s:byte(i, i + 2)
+        local n = a * 65536 + (b or 0) * 256 + (c or 0)
+        local c1 = bit32.rshift(n, 18) + 1
+        local c2 = bit32.band(bit32.rshift(n, 12), 63) + 1
+        local c3 = bit32.band(bit32.rshift(n, 6), 63) + 1
+        local c4 = bit32.band(n, 63) + 1
+        out[#out + 1] = CODE_ALPHABET:sub(c1, c1) .. CODE_ALPHABET:sub(c2, c2)
+        if b then out[#out + 1] = CODE_ALPHABET:sub(c3, c3) end
+        if c then out[#out + 1] = CODE_ALPHABET:sub(c4, c4) end
+    end
+    return table.concat(out)
+end
+
+local function codeToBytes(code)
+    local len = #code
+    if len % 4 == 1 then return nil end
+    local out = {}
+    for i = 1, len, 4 do
+        local chunk = code:sub(i, i + 3)
+        local cnt = #chunk
+        local n = 0
+        for j = 1, 4 do
+            local v = 0
+            if j <= cnt then
+                v = CODE_DECODE[chunk:sub(j, j)]
+                if v == nil then return nil end
+            end
+            n = n * 64 + v
+        end
+        local a = bit32.rshift(n, 16)
+        local b = bit32.band(bit32.rshift(n, 8), 255)
+        local c = bit32.band(n, 255)
+        if cnt == 4 then out[#out + 1] = string.char(a, b, c)
+        elseif cnt == 3 then out[#out + 1] = string.char(a, b)
+        elseif cnt == 2 then out[#out + 1] = string.char(a)
+        else return nil end
+    end
+    return table.concat(out)
+end
+
+-- Chỉ nhận giá trị an toàn: boolean, number, string ngắn, bảng 3 số (màu)
+local function cleanSnapshot(src)
+    local snap, count = {}, 0
+    if type(src) ~= "table" then return snap, 0 end
+    for k, v in pairs(src) do
+        if type(k) == "string" and #k <= 60 and k:sub(1, 1) ~= "_" then
+            local tv = type(v)
+            local good = nil
+            if tv == "boolean" then good = v
+            elseif tv == "number" then
+                if v == v and v > -1e15 and v < 1e15 then good = v end
+            elseif tv == "string" then
+                if #v <= 200 then good = v end
+            elseif tv == "table" then
+                if #v == 3 and type(v[1]) == "number" and type(v[2]) == "number" and type(v[3]) == "number" then
+                    good = {v[1], v[2], v[3]}
+                end
+            end
+            if good ~= nil then snap[k] = good; count = count + 1 end
+        end
+    end
+    return snap, count
+end
+
+-- Chia code thành 2-9 dòng cho dễ nhìn
+local function formatCodeLines(code)
+    local len = #code
+    local width = math.max(64, math.ceil(len / 9))
+    if math.ceil(len / width) < 2 then width = math.ceil(len / 2) end
+    local lines = {}
+    for i = 1, len, width do lines[#lines + 1] = code:sub(i, i + width - 1) end
+    return table.concat(lines, "\n")
+end
+
+local function EncodeConfigCode(secret, snapshot, days)
+    days = math.clamp(math.floor(tonumber(days) or 7), 1, 30)
+    local snap, count = cleanSnapshot(snapshot)
+    if count == 0 then return nil end
+    local plain = tostring(os.time() + days * 86400) .. "|" .. HttpService:JSONEncode(snap)
+    local nonce = randomBytes(4)
+    local mac = macOf(secret, nonce .. plain)
+    local raw = nonce .. xorStream(secret, nonce, plain) .. mac
+    return formatCodeLines("(" .. bytesToCode(raw) .. ")")
+end
+
+-- Trả về: true, bảng cài đặt  |  false, "invalid"  |  false, "expired"
+local function DecodeConfigCode(secret, text)
+    local flat = tostring(text or ""):gsub("%s", "")
+    if #flat < 20 or #flat > CODE_MAX_LEN then return false, "invalid" end
+    local body = flat:match("^%(([A-Za-z0-9!?]+)%)$")
+    if not body then return false, "invalid" end
+    local raw = codeToBytes(body)
+    if not raw or #raw < 4 + 8 + 4 then return false, "invalid" end
+    local nonce = raw:sub(1, 4)
+    local mac = raw:sub(#raw - 7)
+    local plain = xorStream(secret, nonce, raw:sub(5, #raw - 8))
+    if macOf(secret, nonce .. plain) ~= mac then return false, "invalid" end
+    local expireStr, json = plain:match("^(%d+)|(.*)$")
+    local expire = tonumber(expireStr)
+    if not expire or not json then return false, "invalid" end
+    local now = os.time()
+    if expire - now > 30 * 86400 + 120 then return false, "invalid" end
+    if now > expire then return false, "expired" end
+    local ok, data = pcall(function() return HttpService:JSONDecode(json) end)
+    if not ok or type(data) ~= "table" then return false, "invalid" end
+    local snap, count = cleanSnapshot(data)
+    if count == 0 then return false, "invalid" end
+    return true, snap
+end
+
 local function CreateRipple(button)
     button.ClipsDescendants = true
     local m = UserInputService:GetMouseLocation()
@@ -131,6 +303,8 @@ function AlatferaLib.CreateWindow(config)
     local particleColor = ParseColor(config.ParticleColor, themeColor)
 
     local configFile = config.ConfigFile or "Alatfera_Config.json"
+    local configSecret = tostring(config.ConfigSecret or "Alatfera#Secret@14")
+    local configExpireDays = math.clamp(math.floor(tonumber(config.ConfigExpireDays) or 7), 1, 30)
     local savedData = {}
     if readfile and isfile and isfile(configFile) then
         pcall(function() savedData = HttpService:JSONDecode(readfile(configFile)) end)
@@ -981,8 +1155,8 @@ function AlatferaLib.CreateWindow(config)
 
     -- ============ COPY/PASTE CONFIG ============
     local PastePanel = Instance.new("Frame")
-    PastePanel.Size = UDim2.new(0, 400, 0, 200)
-    PastePanel.Position = UDim2.new(0.5, -200, 0.5, -100)
+    PastePanel.Size = UDim2.new(0, 400, 0, 240)
+    PastePanel.Position = UDim2.new(0.5, -200, 0.5, -120)
     PastePanel.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     PastePanel.BorderSizePixel = 0
     PastePanel.Visible = false
@@ -997,7 +1171,7 @@ function AlatferaLib.CreateWindow(config)
     PPTitle.Size = UDim2.new(1, -50, 0, 30)
     PPTitle.Position = UDim2.new(0, 14, 0, 8)
     PPTitle.BackgroundTransparency = 1
-    PPTitle.Text = "📥 DÁN CONFIG"
+    PPTitle.Text = "📥 DÁN CODE CONFIG"
     PPTitle.TextColor3 = themeColor
     PPTitle.Font = Enum.Font.GothamBold
     PPTitle.TextSize = 14
@@ -1016,11 +1190,11 @@ function AlatferaLib.CreateWindow(config)
     PPClose.Parent = PastePanel
 
     local PPInput = Instance.new("TextBox")
-    PPInput.Size = UDim2.new(1, -28, 0, 100)
+    PPInput.Size = UDim2.new(1, -28, 0, 140)
     PPInput.Position = UDim2.new(0, 14, 0, 42)
     PPInput.BackgroundColor3 = Color3.fromRGB(24, 27, 36)
     PPInput.Text = ""
-    PPInput.PlaceholderText = "Dán JSON config vào đây..."
+    PPInput.PlaceholderText = "Dán code config vào đây..."
     PPInput.TextColor3 = Color3.fromRGB(240, 240, 245)
     PPInput.PlaceholderColor3 = Color3.fromRGB(110, 115, 130)
     PPInput.Font = Enum.Font.Code
@@ -1029,12 +1203,13 @@ function AlatferaLib.CreateWindow(config)
     PPInput.TextXAlignment = Enum.TextXAlignment.Left
     PPInput.TextYAlignment = Enum.TextYAlignment.Top
     PPInput.ClearTextOnFocus = false
+    PPInput.MultiLine = true
     PPInput.Parent = PastePanel
     local PPIC = Instance.new("UICorner"); PPIC.CornerRadius = UDim.new(0, 6); PPIC.Parent = PPInput
 
     local PPApply = Instance.new("TextButton")
     PPApply.Size = UDim2.new(1, -28, 0, 32)
-    PPApply.Position = UDim2.new(0, 14, 0, 152)
+    PPApply.Position = UDim2.new(0, 14, 0, 192)
     PPApply.BackgroundColor3 = themeColor
     PPApply.Text = "✓ Áp Dụng Config"
     PPApply.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1050,59 +1225,64 @@ function AlatferaLib.CreateWindow(config)
 
     Track(PPApply.MouseButton1Click:Connect(function()
         local text = PPInput.Text
-        if text == "" then
-            Window:Notify({ Title = "Lỗi", Text = "Chưa dán config!", Color = "red" })
+        if text:gsub("%s", "") == "" then
+            Window:Notify({ Title = "Lỗi", Text = "Chưa dán code!", Color = "red" })
             return
         end
 
-        local ok, data = pcall(function() return HttpService:JSONDecode(text) end)
-        if not ok or type(data) ~= "table" then
-            Window:Notify({ Title = "Lỗi", Text = "Config không hợp lệ (JSON sai)!", Color = "red" })
-            return
-        end
-
-        local applied = 0
-        for k, v in pairs(data) do
-            if k ~= "_Presets" and k ~= "_SavedKey" then
-                savedData[k] = v
-                applied = applied + 1
-            end
-        end
-
-        if applied > 0 then
-            SaveCurrentConfig()
-            for _, fn in ipairs(presetAppliers) do pcall(fn) end
+        local ok, res = Window:ImportConfig(text)
+        if ok then
             Window:Notify({
                 Title = "✅ Thành Công",
-                Text = "Đã áp dụng " .. applied .. " cài đặt!",
+                Text = "Đã áp dụng " .. res .. " cài đặt!",
                 Color = "green",
             })
             PastePanel.Visible = false
             PPInput.Text = ""
         else
-            Window:Notify({ Title = "Lỗi", Text = "Config trống!", Color = "red" })
+            -- Code sai: xóa code đã dán và báo sai
+            PPInput.Text = ""
+            local msg = (res == "expired") and "Code đã hết hạn!" or "Code sai!"
+            PPInput.PlaceholderText = "❌ " .. msg
+            PPInput.PlaceholderColor3 = Color3.fromRGB(245, 65, 85)
+            Window:Notify({ Title = "❌ Lỗi", Text = msg, Color = "red" })
+            task.delay(2, function()
+                PPInput.PlaceholderText = "Dán code config vào đây..."
+                PPInput.PlaceholderColor3 = Color3.fromRGB(110, 115, 130)
+            end)
         end
     end))
 
     Track(CopyCfgBtn.MouseButton1Click:Connect(function()
-        local snapshot = {}
-        for k, v in pairs(savedData) do
-            if k ~= "_SavedKey" then snapshot[k] = v end
+        local code, days = Window:ExportConfig()
+        if not code then
+            Window:Notify({ Title = "Lỗi", Text = "Chưa có cài đặt nào để copy!", Color = "red" })
+            return
         end
-        local json = HttpService:JSONEncode(snapshot)
-        CopyToClipboard(json)
-        Window:Notify({
-            Title = "📋 Đã Copy",
-            Text = "Config đã được copy vào clipboard!",
-            Color = "green",
-        })
+        if setclipboard or toclipboard then
+            CopyToClipboard(code)
+            Window:Notify({
+                Title = "📋 Đã Copy",
+                Text = "Code config hết hạn sau " .. days .. " ngày.",
+                Color = "green",
+            })
+        else
+            PastePanel.Visible = true
+            PastePanel.ZIndex = 100
+            PPInput.Text = code
+            Window:Notify({
+                Title = "📋 Copy thủ công",
+                Text = "Executor không hỗ trợ clipboard, hãy copy trong khung.",
+                Color = "yellow",
+            })
+        end
     end))
 
     Track(PasteCfgBtn.MouseButton1Click:Connect(function()
         PastePanel.Visible = true
         PastePanel.ZIndex = 100
         local cb = GetFromClipboard()
-        if cb ~= "" and cb:sub(1,1) == "{" then
+        if cb ~= "" and cb:match("^%s*%(") then
             PPInput.Text = cb
         end
     end))
@@ -1180,6 +1360,31 @@ function AlatferaLib.CreateWindow(config)
             return true
         end
         return false
+    end
+
+    -- ============ EXPORT / IMPORT CONFIG CODE ============
+    function Window:SetConfigExpireDays(n)
+        configExpireDays = math.clamp(math.floor(tonumber(n) or 7), 1, 30)
+    end
+
+    -- Trả về: code, số ngày hết hạn  (code = nil nếu chưa có cài đặt để chia sẻ)
+    function Window:ExportConfig(days)
+        local d = math.clamp(math.floor(tonumber(days) or configExpireDays), 1, 30)
+        return EncodeConfigCode(configSecret, savedData, d), d
+    end
+
+    -- Trả về: true, số cài đặt đã áp dụng  |  false, "invalid"/"expired"
+    function Window:ImportConfig(code)
+        local ok, res = DecodeConfigCode(configSecret, code)
+        if not ok then return false, res end
+        local applied = 0
+        for k, v in pairs(res) do
+            savedData[k] = v
+            applied = applied + 1
+        end
+        SaveCurrentConfig()
+        for _, fn in ipairs(presetAppliers) do pcall(fn) end
+        return true, applied
     end
 
     -- ============ THEME SWITCHER ============
