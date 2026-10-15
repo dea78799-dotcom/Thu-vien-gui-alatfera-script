@@ -85,12 +85,14 @@ end
 
 local function AttachButtonEffects(button, trackFn, hoverColor)
     local scale = Instance.new("UIScale"); scale.Scale = 1; scale.Parent = button
+    local baseColor = button.BackgroundColor3
     trackFn(button.MouseEnter:Connect(function()
         TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Quart), {Scale = 1.02}):Play()
         if hoverColor then TweenService:Create(button, TweenInfo.new(0.18), {BackgroundColor3 = hoverColor}):Play() end
     end))
     trackFn(button.MouseLeave:Connect(function()
         TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Quart), {Scale = 1}):Play()
+        if hoverColor then TweenService:Create(button, TweenInfo.new(0.18), {BackgroundColor3 = baseColor}):Play() end
     end))
     trackFn(button.MouseButton1Down:Connect(function()
         TweenService:Create(scale, TweenInfo.new(0.1), {Scale = 0.97}):Play()
@@ -378,8 +380,11 @@ function AlatferaLib.CreateWindow(config)
     local savedParticleState = enableParticles
 
     local blurEffect = nil
+    local oldBlur = Lighting:FindFirstChild("AlatferaBlur")
+    if oldBlur then oldBlur:Destroy() end
     if enableBlur then
         blurEffect = Instance.new("BlurEffect")
+        blurEffect.Name = "AlatferaBlur"
         blurEffect.Size = 0
         blurEffect.Parent = Lighting
         TweenService:Create(blurEffect, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = blurSize}):Play()
@@ -420,8 +425,8 @@ function AlatferaLib.CreateWindow(config)
                 local p = data.frame
                 if p and p.Parent then
                     data.wobble = data.wobble + dt * 2
-                    local newY = p.Position.Y.Scale - data.speed * dt
-                    local newX = p.Position.X.Scale + data.drift + math.sin(data.wobble) * 0.0005
+                    local newY = p.Position.Y.Scale - data.speed * dt * 4
+                    local newX = p.Position.X.Scale + (data.drift + math.sin(data.wobble) * 0.0005) * dt * 60
                     if newY < -0.05 then newY = 1.05; newX = math.random() end
                     if newX < -0.05 then newX = 1.05 elseif newX > 1.05 then newX = -0.05 end
                     p.Position = UDim2.new(newX, 0, newY, 0)
@@ -540,12 +545,15 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
+    local lastFocusClose = 0
     Track(SearchToggleBtn.MouseButton1Click:Connect(function()
+        if not isSearchOpen and tick() - lastFocusClose < 0.3 then return end
         setSearchOpen(not isSearchOpen)
     end))
     Track(SearchBox.FocusLost:Connect(function()
         TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(12, 14, 19)}):Play()
         if SearchBox.Text == "" and isSearchOpen then
+            lastFocusClose = tick()
             setSearchOpen(false)
         end
     end))
@@ -870,7 +878,7 @@ function AlatferaLib.CreateWindow(config)
     function Window:Notify(notifConfig)
         notifConfig = notifConfig or {}
         local title    = notifConfig.Title or "Thông Báo"
-        local text     = notifConfig.Text or ""
+        local text     = tostring(notifConfig.Text or "")
         local duration = notifConfig.Duration or 3
         local nColor   = ParseColor(notifConfig.Color, Window.ThemeColor)
         local pos      = notifConfig.Position
@@ -2553,6 +2561,7 @@ function AlatferaLib.CreateWindow(config)
         if enabled then
             if not blurEffect or not blurEffect.Parent then
                 blurEffect = Instance.new("BlurEffect")
+                blurEffect.Name = "AlatferaBlur"
                 blurEffect.Size = 0
                 blurEffect.Parent = Lighting
             end
