@@ -293,6 +293,10 @@ function AlatferaLib.CreateWindow(config)
     local useKeySystem = config.KeySystem or false
     local correctKey   = config.Key or "AlatferaKey123"
     local discordLink  = config.DiscordLink or "https://discord.gg/alatfera"
+    local discordShow  = (config.DiscordLink ~= false)   -- DiscordLink = false: ẩn nút Discord
+    local discordText  = tostring(config.DiscordText or "📋 Copy Discord")
+    local keyLink      = (type(config.KeyLink) == "string" and config.KeyLink ~= "") and config.KeyLink or nil
+    local keyLinkText  = tostring(config.KeyLinkText or "🔑 Copy Link Lấy Key")
     local maxAttempts  = config.MaxAttempts or 10
     local remainingAttempts = maxAttempts
 
@@ -326,6 +330,7 @@ function AlatferaLib.CreateWindow(config)
     local connections = {}
     local function Track(c) table.insert(connections, c); return c end
     local presetAppliers = {}
+    local modalCount = 0   -- > 0 khi có hộp xác nhận đang mở
     local themeTargets = {}
 
     local function registerTheme(instance, property)
@@ -342,8 +347,9 @@ function AlatferaLib.CreateWindow(config)
         local keyPassed = (savedData["_SavedKey"] == correctKey)
         if not keyPassed then
             local KeyFrame = Instance.new("Frame")
-            KeyFrame.Size = UDim2.new(0, 360, 0, 220)
-            KeyFrame.Position = UDim2.new(0.5, -180, 0.5, -110)
+            local keyH = keyLink and 262 or 220
+            KeyFrame.Size = UDim2.new(0, 360, 0, keyH)
+            KeyFrame.Position = UDim2.new(0.5, -180, 0.5, -keyH / 2)
             KeyFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
             KeyFrame.BorderSizePixel = 0
             KeyFrame.Parent = ScreenGui
@@ -384,7 +390,7 @@ function AlatferaLib.CreateWindow(config)
             StatusLabel.Parent = KeyFrame
 
             local SubmitBtn = Instance.new("TextButton")
-            SubmitBtn.Size = UDim2.new(0.46, 0, 0, 34); SubmitBtn.Position = UDim2.new(0, 15, 0, 136)
+            SubmitBtn.Size = discordShow and UDim2.new(0.46, 0, 0, 34) or UDim2.new(1, -30, 0, 34); SubmitBtn.Position = UDim2.new(0, 15, 0, 136)
             SubmitBtn.BackgroundColor3 = themeColor; SubmitBtn.Text = "Xác Nhận"
             SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             SubmitBtn.Font = Enum.Font.GothamBold; SubmitBtn.TextSize = 13
@@ -395,9 +401,10 @@ function AlatferaLib.CreateWindow(config)
 
             local DiscordBtn = Instance.new("TextButton")
             DiscordBtn.Size = UDim2.new(0.46, 0, 0, 34); DiscordBtn.Position = UDim2.new(0.54, -5, 0, 136)
-            DiscordBtn.BackgroundColor3 = Color3.fromRGB(70, 80, 200); DiscordBtn.Text = "📋 Copy Discord"
+            DiscordBtn.BackgroundColor3 = Color3.fromRGB(70, 80, 200); DiscordBtn.Text = discordText
             DiscordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             DiscordBtn.Font = Enum.Font.GothamBold; DiscordBtn.TextSize = 12
+            DiscordBtn.Visible = discordShow
             DiscordBtn.Parent = KeyFrame
             local DC = Instance.new("UICorner"); DC.CornerRadius = UDim.new(0, cornerRadius - 2); DC.Parent = DiscordBtn
             AttachButtonEffects(DiscordBtn, Track)
@@ -406,8 +413,29 @@ function AlatferaLib.CreateWindow(config)
                 CopyToClipboard(discordLink)
                 DiscordBtn.Text = "✓ Đã Copy!"
                 task.wait(1.5)
-                DiscordBtn.Text = "📋 Copy Discord"
+                DiscordBtn.Text = discordText
             end))
+
+            if keyLink then
+                local KeyLinkBtn = Instance.new("TextButton")
+                KeyLinkBtn.Size = UDim2.new(1, -30, 0, 34); KeyLinkBtn.Position = UDim2.new(0, 15, 0, 178)
+                KeyLinkBtn.BackgroundColor3 = Color3.fromRGB(40, 150, 110)
+                KeyLinkBtn.Text = keyLinkText
+                KeyLinkBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                KeyLinkBtn.Font = Enum.Font.GothamBold; KeyLinkBtn.TextSize = 12
+                KeyLinkBtn.Parent = KeyFrame
+                local KLC = Instance.new("UICorner"); KLC.CornerRadius = UDim.new(0, cornerRadius - 2); KLC.Parent = KeyLinkBtn
+                AttachButtonEffects(KeyLinkBtn, Track)
+                Track(KeyLinkBtn.MouseButton1Click:Connect(function()
+                    CopyToClipboard(keyLink)
+                    if not (setclipboard or toclipboard) then
+                        StatusLabel.Text = keyLink   -- executor không có clipboard: hiện link ra để copy tay
+                    end
+                    KeyLinkBtn.Text = "✓ Đã Copy!"
+                    task.wait(1.5)
+                    KeyLinkBtn.Text = keyLinkText
+                end))
+            end
 
             local dragK, startK, posK
             Track(KeyFrame.InputBegan:Connect(function(input)
@@ -537,13 +565,18 @@ function AlatferaLib.CreateWindow(config)
     Window.ThemeColor = themeColor
 
     local MainFrame = Instance.new("Frame")
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.Size = UDim2.new(0.70, 0, 0.88, 0)
-    MainFrame.Position = UDim2.new(0.15, 0, 0.06, 0)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
     local MC = Instance.new("UICorner"); MC.CornerRadius = UDim.new(0, cornerRadius); MC.Parent = MainFrame
+    local MSize = Instance.new("UISizeConstraint")
+    MSize.MinSize = Vector2.new(380, 260)
+    MSize.MaxSize = Vector2.new(760, 480)
+    MSize.Parent = MainFrame
     if enableStroke then
         local MS = Instance.new("UIStroke"); MS.Color = strokeColor; MS.Thickness = 2; MS.Parent = MainFrame
     end
@@ -620,6 +653,22 @@ function AlatferaLib.CreateWindow(config)
     Topbar.Parent = MainFrame
     local TC = Instance.new("UICorner"); TC.CornerRadius = UDim.new(0, cornerRadius); TC.Parent = Topbar
 
+    local TopAccent = Instance.new("Frame")
+    TopAccent.Size = UDim2.new(1, -2 * math.min(cornerRadius, 20), 0, 2)
+    TopAccent.Position = UDim2.new(0, math.min(cornerRadius, 20), 1, -2)
+    TopAccent.BackgroundColor3 = themeColor
+    TopAccent.BorderSizePixel = 0
+    TopAccent.Parent = Topbar
+    local TopAccentGrad = Instance.new("UIGradient")
+    TopAccentGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.2, 0),
+        NumberSequenceKeypoint.new(0.8, 0),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    TopAccentGrad.Parent = TopAccent
+    registerTheme(TopAccent, "BackgroundColor3")
+
     local topGradient = Instance.new("UIGradient")
     topGradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 23, 32)),
@@ -648,6 +697,11 @@ function AlatferaLib.CreateWindow(config)
     StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
     StatsLabel.Font = Enum.Font.Gotham; StatsLabel.TextSize = 12
     StatsLabel.Parent = Topbar
+    local function updateStatsVisibility()
+        StatsLabel.Visible = MainFrame.AbsoluteSize.X >= 640
+    end
+    updateStatsVisibility()
+    Track(MainFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateStatsVisibility))
 
     local frameCount, lastTime = 0, tick()
     Track(RunService.RenderStepped:Connect(function()
@@ -669,6 +723,15 @@ function AlatferaLib.CreateWindow(config)
         b.TextColor3 = color or Color3.fromRGB(180, 185, 200)
         b.TextSize = size or 16
         b.Font = Enum.Font.GothamBold; b.Parent = Topbar
+        b.AutoButtonColor = false
+        b.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0, 8); bc.Parent = b
+        Track(b.MouseEnter:Connect(function()
+            TweenService:Create(b, TweenInfo.new(0.15), {BackgroundTransparency = 0.88}):Play()
+        end))
+        Track(b.MouseLeave:Connect(function()
+            TweenService:Create(b, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+        end))
         return b
     end
 
@@ -803,7 +866,7 @@ function AlatferaLib.CreateWindow(config)
     end))
 
     Track(UserInputService.InputBegan:Connect(function(input, gpe)
-        if not gpe and input.KeyCode == currentToggleKey then
+        if not gpe and modalCount == 0 and input.KeyCode == currentToggleKey then
             if MainFrame.Visible then
                 savedBlurState = Window:IsBlurEnabled()
                 savedParticleState = Window:IsParticlesEnabled()
@@ -823,7 +886,7 @@ function AlatferaLib.CreateWindow(config)
     -- ============ DRAG LOGIC (kéo bằng Topbar) ============
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
-        if isLocked then return end
+        if isLocked or modalCount > 0 then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
@@ -831,7 +894,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
     Track(UserInputService.InputChanged:Connect(function(input)
-        if isLocked then dragging = false; return end
+        if isLocked or modalCount > 0 then dragging = false; return end
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
@@ -900,6 +963,7 @@ function AlatferaLib.CreateWindow(config)
     ContentArea.Parent = MainFrame
 
     local FirstTab = true
+    local tabAccents = {}
 
     Track(SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(SearchBox.Text)
@@ -915,7 +979,347 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- ============ NOTIFICATION SYSTEM (X + History) ============
+-- ============ PROFILE CARD (avatar + tên) ============
+    local function buildProfile(parent, cfg)
+        cfg = cfg or {}
+        local obj = {}
+        local F = Instance.new("Frame")
+        F.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
+        F.BorderSizePixel = 0
+        F.Parent = parent
+        local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(0, cornerRadius); FC.Parent = F
+        if enableStroke then
+            local FS = Instance.new("UIStroke"); FS.Color = strokeColor; FS.Thickness = 1; FS.Parent = F
+        end
+
+        local showAvatar = (cfg.ShowAvatar == nil) and true or cfg.ShowAvatar
+
+        local Av = Instance.new("ImageLabel")
+        Av.Name = "AvatarSlot"
+        Av.Size = UDim2.new(0, 34, 0, 34)
+        Av.Position = UDim2.new(0, 8, 0.5, -17)
+        Av.BackgroundColor3 = Color3.fromRGB(30, 34, 46)
+        Av.BorderSizePixel = 0
+        Av.ScaleType = Enum.ScaleType.Crop
+        Av.Visible = showAvatar
+        Av.Parent = F
+        local AvC = Instance.new("UICorner"); AvC.CornerRadius = UDim.new(1, 0); AvC.Parent = Av
+        local AvS = Instance.new("UIStroke"); AvS.Color = themeColor; AvS.Thickness = 1.5; AvS.Parent = Av
+        registerTheme(AvS, "Color")
+
+        local function resolveImage(img)
+            if type(img) == "number" then return "rbxassetid://" .. img end
+            if type(img) == "string" and img ~= "" then return img end
+            return "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
+        end
+        Av.Image = resolveImage(cfg.Image)
+
+        local textX = showAvatar and 50 or 10
+        local NameL = Instance.new("TextLabel")
+        NameL.Size = UDim2.new(1, -(textX + 6), 0, 18)
+        NameL.Position = UDim2.new(0, textX, 0.5, -17)
+        NameL.BackgroundTransparency = 1
+        NameL.Text = tostring(cfg.Name or LocalPlayer.DisplayName)
+        NameL.TextColor3 = Color3.fromRGB(240, 240, 245)
+        NameL.Font = Enum.Font.GothamBold
+        NameL.TextSize = 12
+        NameL.TextXAlignment = Enum.TextXAlignment.Left
+        NameL.TextTruncate = Enum.TextTruncate.AtEnd
+        NameL.Parent = F
+
+        local SubL = Instance.new("TextLabel")
+        SubL.Size = UDim2.new(1, -(textX + 6), 0, 16)
+        SubL.Position = UDim2.new(0, textX, 0.5, 1)
+        SubL.BackgroundTransparency = 1
+        SubL.TextColor3 = Color3.fromRGB(140, 145, 160)
+        SubL.Font = Enum.Font.Gotham
+        SubL.TextSize = 11
+        SubL.TextXAlignment = Enum.TextXAlignment.Left
+        SubL.TextTruncate = Enum.TextTruncate.AtEnd
+        SubL.Parent = F
+
+        local function applySub(t)
+            if t == false then
+                SubL.Visible = false
+                NameL.Position = UDim2.new(0, textX, 0.5, -9)
+            else
+                SubL.Visible = true
+                NameL.Position = UDim2.new(0, textX, 0.5, -17)
+                SubL.Text = tostring(t)
+            end
+        end
+        if cfg.SubText == nil then applySub("ID: " .. LocalPlayer.UserId) else applySub(cfg.SubText) end
+
+        obj.Frame = F
+        function obj:GetFrame() return F end
+        function obj:GetImageSlot() return Av end
+        function obj:SetName(t) NameL.Text = tostring(t) end
+        function obj:SetSubText(t) applySub(t) end
+        function obj:SetImage(img) Av.Image = resolveImage(img) end
+        function obj:Destroy() F:Destroy() end
+        return obj
+    end
+
+    local profileCard = nil
+    local function updateSidebarLayout()
+        local base = showPlaytime and -86 or -58
+        Sidebar.Size = UDim2.new(0, 160, 1, profileCard and (base - 54) or base)
+        if profileCard then
+            profileCard.Frame.Position = UDim2.new(0, 10, 1, showPlaytime and -82 or -54)
+        end
+    end
+
+    -- Hiện (hoặc tạo lại) thẻ avatar ở cuối thanh bên
+    function Window:ShowProfile(cfg)
+        if profileCard then profileCard.Frame:Destroy(); profileCard = nil end
+        profileCard = buildProfile(MainFrame, cfg)
+        profileCard.Frame.Size = UDim2.new(0, 160, 0, 48)
+        profileCard.Destroy = function() Window:RemoveProfile() end
+        updateSidebarLayout()
+        return profileCard
+    end
+
+    function Window:RemoveProfile()
+        if profileCard then
+            local c = profileCard
+            profileCard = nil
+            c.Frame:Destroy()
+            updateSidebarLayout()
+        end
+    end
+
+    -- Đổi nội dung thẻ: Window:SetProfile({Name=..., SubText=..., Image=...})
+    function Window:SetProfile(cfg)
+        cfg = cfg or {}
+        if not profileCard then return Window:ShowProfile(cfg) end
+        if cfg.Name ~= nil then profileCard:SetName(cfg.Name) end
+        if cfg.SubText ~= nil then profileCard:SetSubText(cfg.SubText) end
+        if cfg.Image ~= nil then profileCard:SetImage(cfg.Image) end
+        return profileCard
+    end
+
+    function Window:GetProfile() return profileCard end
+
+    -- Khung avatar nổi riêng (không nằm trong thanh bên)
+    function Window:CreateProfileFrame(cfg)
+        cfg = cfg or {}
+        local card = buildProfile(ScreenGui, cfg)
+        card.Frame.Size = UDim2.new(0, cfg.Width or 200, 0, cfg.Height or 52)
+        card.Frame.Position = UDim2.new(0, cfg.X or 20, 0, cfg.Y or 60)
+        if cfg.Draggable then
+            local dg, ds, sp
+            Track(card.Frame.InputBegan:Connect(function(input)
+                if modalCount > 0 then return end
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dg = true; ds = input.Position; sp = card.Frame.Position
+                end
+            end))
+            Track(UserInputService.InputChanged:Connect(function(input)
+                if dg and modalCount == 0 and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = input.Position - ds
+                    card.Frame.Position = UDim2.new(0, sp.X.Offset + delta.X, 0, sp.Y.Offset + delta.Y)
+                end
+            end))
+            Track(UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dg = false end
+            end))
+        end
+        function card:SetPosition(x, y) card.Frame.Position = UDim2.new(0, x, 0, y) end
+        function card:Show() card.Frame.Visible = true end
+        function card:Hide() card.Frame.Visible = false end
+        return card
+    end
+
+    if config.ProfileCard == nil or config.ProfileCard then
+        Window:ShowProfile({
+            Name = config.ProfileName,
+            SubText = config.ProfileSubText,
+            Image = config.ProfileImage,
+            ShowAvatar = config.ProfileShowAvatar,
+        })
+    end
+
+    -- ============ HỘP XÁC NHẬN (CONFIRM) ============
+    local confirmEnabled = (config.ConfirmEnabled == nil) and true or config.ConfirmEnabled
+
+    function Window:SetConfirmEnabled(b) confirmEnabled = b and true or false end
+    function Window:IsConfirmEnabled() return confirmEnabled end
+    function Window:IsConfirmOpen() return modalCount > 0 end
+
+    local function safeCall(fn, ...)
+        if type(fn) == "function" then
+            local ok, err = pcall(fn, ...)
+            if not ok then warn("[Alatfera] " .. tostring(err)) end
+        end
+    end
+
+    -- cfg: Title, Text, ConfirmText, CancelText, OnConfirm, OnCancel,
+    --      Buttons = { {Text=..., Callback=..., Close=true}, ... } (tối đa 8 nút thêm),
+    --      Danger (nút đồng ý màu đỏ), Color, CloseOnBackdrop
+    function Window:Confirm(cfg)
+        cfg = cfg or {}
+        if not confirmEnabled then
+            safeCall(cfg.OnConfirm)
+            return nil
+        end
+
+        local title = tostring(cfg.Title or "Xác nhận")
+        local text = tostring(cfg.Text or "Bạn có chắc chắn muốn tiếp tục?")
+        local confirmText = tostring(cfg.ConfirmText or "Đồng ý")
+        local cancelText = tostring(cfg.CancelText or "Hủy")
+        local extra = {}
+        if type(cfg.Buttons) == "table" then
+            for i = 1, math.min(#cfg.Buttons, 8) do
+                if type(cfg.Buttons[i]) == "table" then extra[#extra + 1] = cfg.Buttons[i] end
+            end
+        end
+        local accent = ParseColor(cfg.Color or (cfg.Danger and "red") or nil, Window.ThemeColor)
+
+        modalCount = modalCount + 1
+        local dialogW = 300
+        local textSize = TextService:GetTextSize(text, 13, Enum.Font.Gotham, Vector2.new(dialogW - 40, 1000))
+        local extraY = 46 + textSize.Y + 14
+        local extraH = math.min(#extra * 38, 152)
+        local rowY = extraY + extraH + (#extra > 0 and 6 or 0)
+        local dialogH = rowY + 36 + 16
+
+        -- Lớp nền chặn mọi thao tác phía sau
+        local Backdrop = Instance.new("TextButton")
+        Backdrop.Name = "ConfirmBackdrop"
+        Backdrop.Size = UDim2.new(1, 0, 1, 0)
+        Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        Backdrop.BackgroundTransparency = 1
+        Backdrop.BorderSizePixel = 0
+        Backdrop.Text = ""
+        Backdrop.AutoButtonColor = false
+        Backdrop.Active = true
+        Backdrop.ZIndex = 200
+        Backdrop.Parent = ScreenGui
+        TweenService:Create(Backdrop, TweenInfo.new(0.2), {BackgroundTransparency = 0.45}):Play()
+
+        local Dialog = Instance.new("Frame")
+        Dialog.AnchorPoint = Vector2.new(0.5, 0.5)
+        Dialog.Position = UDim2.new(0.5, 0, 0.5, 0)
+        Dialog.Size = UDim2.new(0, dialogW, 0, dialogH)
+        Dialog.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
+        Dialog.BorderSizePixel = 0
+        Dialog.Active = true
+        Dialog.ZIndex = 201
+        Dialog.Parent = Backdrop
+        local DC = Instance.new("UICorner"); DC.CornerRadius = UDim.new(0, cornerRadius); DC.Parent = Dialog
+        if enableStroke then
+            local DS = Instance.new("UIStroke"); DS.Color = strokeColor; DS.Thickness = 2; DS.Parent = Dialog
+        end
+        local dScale = Instance.new("UIScale"); dScale.Scale = 0.85; dScale.Parent = Dialog
+        TweenService:Create(dScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
+        local TitleL = Instance.new("TextLabel")
+        TitleL.Size = UDim2.new(1, -40, 0, 24); TitleL.Position = UDim2.new(0, 20, 0, 16)
+        TitleL.BackgroundTransparency = 1
+        TitleL.Text = title
+        TitleL.TextColor3 = accent
+        TitleL.Font = Enum.Font.GothamBold; TitleL.TextSize = 16
+        TitleL.TextXAlignment = Enum.TextXAlignment.Left
+        TitleL.ZIndex = 202
+        TitleL.Parent = Dialog
+
+        local TextL = Instance.new("TextLabel")
+        TextL.Size = UDim2.new(1, -40, 0, textSize.Y); TextL.Position = UDim2.new(0, 20, 0, 46)
+        TextL.BackgroundTransparency = 1
+        TextL.Text = text
+        TextL.TextColor3 = Color3.fromRGB(190, 195, 210)
+        TextL.Font = Enum.Font.Gotham; TextL.TextSize = 13
+        TextL.TextWrapped = true
+        TextL.TextXAlignment = Enum.TextXAlignment.Left
+        TextL.TextYAlignment = Enum.TextYAlignment.Top
+        TextL.ZIndex = 202
+        TextL.Parent = Dialog
+
+        local closed = false
+        local function close()
+            if closed then return end
+            closed = true
+            modalCount = math.max(modalCount - 1, 0)
+            TweenService:Create(dScale, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
+            TweenService:Create(Backdrop, TweenInfo.new(0.18), {BackgroundTransparency = 1}):Play()
+            task.delay(0.22, function() Backdrop:Destroy() end)
+        end
+
+        local noTrack = function(c) return c end
+        local function makeBtn(label, pos, size, bg, onClick, parent)
+            local B = Instance.new("TextButton")
+            B.Size = size; B.Position = pos
+            B.BackgroundColor3 = bg
+            B.Text = label
+            B.TextColor3 = Color3.fromRGB(255, 255, 255)
+            B.Font = Enum.Font.GothamBold; B.TextSize = 13
+            B.AutoButtonColor = false
+            B.ZIndex = 202
+            B.Parent = parent or Dialog
+            local BCc = Instance.new("UICorner"); BCc.CornerRadius = UDim.new(0, cornerRadius - 2); BCc.Parent = B
+            AttachButtonEffects(B, noTrack)
+            B.MouseButton1Click:Connect(onClick)
+            return B
+        end
+
+        -- Các nút thêm (tùy người làm code)
+        if #extra > 0 then
+            local Ex = Instance.new("ScrollingFrame")
+            Ex.Size = UDim2.new(1, -40, 0, extraH)
+            Ex.Position = UDim2.new(0, 20, 0, extraY)
+            Ex.BackgroundTransparency = 1
+            Ex.BorderSizePixel = 0
+            Ex.ScrollBarThickness = 2
+            Ex.CanvasSize = UDim2.new(0, 0, 0, #extra * 38)
+            Ex.ZIndex = 202
+            Ex.Parent = Dialog
+            local ExL = Instance.new("UIListLayout"); ExL.Padding = UDim.new(0, 6); ExL.Parent = Ex
+            for i, b in ipairs(extra) do
+                makeBtn(tostring(b.Text or ("Nút " .. i)),
+                    UDim2.new(),
+                    UDim2.new(1, -6, 0, 32),
+                    Color3.fromRGB(30, 35, 48),
+                    function()
+                        if b.Close ~= false then close() end
+                        safeCall(b.Callback)
+                    end, Ex)
+            end
+        end
+
+        -- Hai nút bắt buộc: Hủy và Đồng ý
+        makeBtn(cancelText,
+            UDim2.new(0, 20, 0, rowY), UDim2.new(0, 125, 0, 36),
+            Color3.fromRGB(50, 56, 72),
+            function() close(); safeCall(cfg.OnCancel) end)
+        makeBtn(confirmText,
+            UDim2.new(0, 155, 0, rowY), UDim2.new(0, 125, 0, 36),
+            accent,
+            function() close(); safeCall(cfg.OnConfirm) end)
+
+        if cfg.CloseOnBackdrop then
+            Backdrop.MouseButton1Click:Connect(function()
+                close(); safeCall(cfg.OnCancel)
+            end)
+        end
+
+        return { Close = close }
+    end
+
+    -- Dùng cho nút/công tắc: confirmCfg = true hoặc bảng cấu hình như Window:Confirm
+    function Window:ConfirmAction(confirmCfg, fn)
+        local cfg = {}
+        if type(confirmCfg) == "table" then
+            for k, v in pairs(confirmCfg) do cfg[k] = v end
+        end
+        local userConfirm = cfg.OnConfirm
+        cfg.OnConfirm = function()
+            safeCall(fn)
+            safeCall(userConfirm)
+        end
+        return Window:Confirm(cfg)
+    end
+
+        -- ============ NOTIFICATION SYSTEM (X + History) ============
     local notifHistory = {}
     local MAX_HISTORY = 50
 
@@ -924,6 +1328,7 @@ function AlatferaLib.CreateWindow(config)
     NotifContainer.Size = UDim2.new(0, 280, 1, -20)
     NotifContainer.Position = UDim2.new(1, -290, 0, 10)
     NotifContainer.BackgroundTransparency = 1
+    NotifContainer.ZIndex = 300
     NotifContainer.Parent = ScreenGui
     local NotifLayout = Instance.new("UIListLayout")
     NotifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
@@ -1054,7 +1459,15 @@ function AlatferaLib.CreateWindow(config)
         local title    = notifConfig.Title or "Thông Báo"
         local text     = tostring(notifConfig.Text or "")
         local duration = notifConfig.Duration or 3
-        local nColor   = ParseColor(notifConfig.Color, Window.ThemeColor)
+        local nType = notifConfig.Type and string.lower(tostring(notifConfig.Type)) or nil
+        local typeStyle = ({
+            success = {"green", "✅ "},
+            error   = {"red", "❌ "},
+            warning = {"yellow", "⚠️ "},
+            info    = {"blue", "ℹ️ "},
+        })[nType]
+        if typeStyle then title = typeStyle[2] .. title end
+        local nColor   = ParseColor(notifConfig.Color or (typeStyle and typeStyle[1]), Window.ThemeColor)
         local pos      = notifConfig.Position
         local fs       = notifConfig.FontSize or notifyFontSize
         local tfs      = notifConfig.TitleSize or notifyTitleSize
@@ -1499,7 +1912,7 @@ function AlatferaLib.CreateWindow(config)
         end
 
         -- CreateButton(text, callback, tooltip, fontSize)
-        function W:CreateButton(btnText, callback, tooltip, fontSize)
+        function W:CreateButton(btnText, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
             local B = Instance.new("TextButton")
@@ -1522,13 +1935,17 @@ function AlatferaLib.CreateWindow(config)
                 TweenService:Create(B, TweenInfo.new(0.1), {BackgroundColor3 = Window.ThemeColor}):Play()
                 task.wait(0.1)
                 TweenService:Create(B, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(24, 28, 38)}):Play()
-                callback()
+                if confirmCfg and Window:IsConfirmEnabled() then
+                    Window:ConfirmAction(confirmCfg, callback)
+                else
+                    callback()
+                end
             end))
             return B
         end
 
         -- CreateToggle(text, flag, default, callback, tooltip, fontSize)
-        function W:CreateToggle(toggleText, flagName, defaultState, callback, tooltip, fontSize)
+        function W:CreateToggle(toggleText, flagName, defaultState, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
             if flagName and savedData[flagName] ~= nil then defaultState = savedData[flagName] end
@@ -1544,6 +1961,7 @@ function AlatferaLib.CreateWindow(config)
                 local TFS = Instance.new("UIStroke"); TFS.Color = strokeColor; TFS.Thickness = 1; TFS.Parent = T
             end
             T:SetAttribute("SearchText", string.lower(toggleText))
+            AttachButtonEffects(T, Track, Color3.fromRGB(30, 35, 48))
             AddTooltip(T, tooltip or toggleText)
             local Lbl = Instance.new("TextLabel")
             Lbl.Size = UDim2.new(1, -55, 1, 0); Lbl.Position = UDim2.new(0, 14, 0, 0)
@@ -1569,10 +1987,17 @@ function AlatferaLib.CreateWindow(config)
                 TweenService:Create(Tr, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundColor3 = state and Window.ThemeColor or Color3.fromRGB(50, 56, 72)}):Play()
                 TweenService:Create(K, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = state and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)}):Play()
             end
-            Track(T.MouseButton1Click:Connect(function()
+            local function doToggle()
                 applyToggle(not state)
                 if flagName then savedData[flagName] = state; SaveCurrentConfig() end
                 callback(state)
+            end
+            Track(T.MouseButton1Click:Connect(function()
+                if confirmCfg and Window:IsConfirmEnabled() then
+                    Window:ConfirmAction(confirmCfg, doToggle)
+                else
+                    doToggle()
+                end
             end))
             if flagName then
                 table.insert(presetAppliers, function()
@@ -2358,7 +2783,17 @@ function AlatferaLib.CreateWindow(config)
         TB.Font = Enum.Font.GothamBold; TB.TextSize = 13
         TB.AutoButtonColor = false
         TB.Parent = Sidebar
-        local TBPad = Instance.new("UIPadding"); TBPad.PaddingLeft = UDim.new(0, 8); TBPad.Parent = TB
+        local TBPad = Instance.new("UIPadding"); TBPad.PaddingLeft = UDim.new(0, 10); TBPad.Parent = TB
+        local TabAccent = Instance.new("Frame")
+        TabAccent.Size = UDim2.new(0, 3, 0.6, 0)
+        TabAccent.Position = UDim2.new(0, 3, 0.2, 0)
+        TabAccent.BackgroundColor3 = themeColor
+        TabAccent.BorderSizePixel = 0
+        TabAccent.Visible = FirstTab
+        TabAccent.Parent = TB
+        local TAC = Instance.new("UICorner"); TAC.CornerRadius = UDim.new(1, 0); TAC.Parent = TabAccent
+        registerTheme(TabAccent, "BackgroundColor3")
+        tabAccents[TB] = TabAccent
         local TBC = Instance.new("UICorner"); TBC.CornerRadius = UDim.new(0, cornerRadius); TBC.Parent = TB
         if enableStroke then
             local TBS = Instance.new("UIStroke"); TBS.Color = strokeColor; TBS.Thickness = 1; TBS.Parent = TB
@@ -2397,6 +2832,8 @@ function AlatferaLib.CreateWindow(config)
                     btn.TextColor3 = Color3.fromRGB(140, 145, 160)
                 end
             end
+            for _, a in pairs(tabAccents) do a.Visible = false end
+            TabAccent.Visible = true
             TabC.Visible = true
             TB.BackgroundColor3 = Color3.fromRGB(28, 33, 46)
             TB.TextColor3 = Color3.fromRGB(255, 255, 255)
