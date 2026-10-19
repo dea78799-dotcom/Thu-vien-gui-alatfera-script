@@ -1,7 +1,8 @@
 --[[
     ============================================
-    ALATFERA LIB V14 - PRO EDITION (FIXED)
+    ALATFERA LIB V14 - PRO EDITION (FIXED & IMPROVED)
     Notify X, History, Mini Search, Copy/Paste Config
+    Custom Selected Tab Style (No Vertical Line)
     ============================================
 ]]
 
@@ -32,6 +33,23 @@ local ColorPresets = {
     neon    = Color3.fromRGB(57, 255, 20),   dark    = Color3.fromRGB(15, 17, 23),
 }
 
+-- Viền luôn bo theo khung
+local function NewStroke()
+    local st = Instance.new("UIStroke")
+    st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    return st
+end
+
+-- Đo chữ an toàn
+local function SafeTextSize(text, size, font, bounds)
+    local ok, res = pcall(function() return TextService:GetTextSize(text, size, font, bounds) end)
+    if ok and res then return res end
+    local lines = 1 + select(2, text:gsub("\n", ""))
+    local perLine = math.max(1, math.floor(bounds.X / (size * 0.55)))
+    lines = lines + math.floor(#text / perLine)
+    return Vector2.new(bounds.X, lines * (size + 2))
+end
+
 local function ParseColor(val, default)
     if type(val) == "string" then
         if val:sub(1,1) == "#" then
@@ -60,7 +78,6 @@ local function GetFromClipboard()
 end
 
 -- ============ CONFIG CODE: mã hóa + chống sửa + hết hạn ============
--- Code chỉ gồm chữ, số và 4 ký hiệu ( ) ! ?
 local CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?"
 local CODE_DECODE = {}
 for i = 1, #CODE_ALPHABET do CODE_DECODE[CODE_ALPHABET:sub(i, i)] = i - 1 end
@@ -161,7 +178,6 @@ local function codeToBytes(code)
     return table.concat(out)
 end
 
--- Chỉ nhận giá trị an toàn: boolean, number, string ngắn, bảng 3 số (màu)
 local function cleanSnapshot(src)
     local snap, count = {}, 0
     if type(src) ~= "table" then return snap, 0 end
@@ -185,7 +201,6 @@ local function cleanSnapshot(src)
     return snap, count
 end
 
--- Chia code thành 2-9 dòng cho dễ nhìn
 local function formatCodeLines(code)
     local len = #code
     local width = math.max(64, math.ceil(len / 9))
@@ -206,7 +221,6 @@ local function EncodeConfigCode(secret, snapshot, days)
     return formatCodeLines("(" .. bytesToCode(raw) .. ")")
 end
 
--- Trả về: true, bảng cài đặt  |  false, "invalid"  |  false, "expired"
 local function DecodeConfigCode(secret, text)
     local flat = tostring(text or ""):gsub("%s", "")
     if #flat < 20 or #flat > CODE_MAX_LEN then return false, "invalid" end
@@ -293,7 +307,8 @@ function AlatferaLib.CreateWindow(config)
     local useKeySystem = config.KeySystem or false
     local correctKey   = config.Key or "AlatferaKey123"
     local discordLink  = config.DiscordLink or "https://discord.gg/alatfera"
-    local discordShow  = (config.DiscordLink ~= false)   -- DiscordLink = false: ẩn nút Discord
+    local rememberKey  = (config.RememberKey == nil) and true or config.RememberKey
+    local discordShow  = (config.DiscordLink ~= false)
     local discordText  = tostring(config.DiscordText or "📋 Copy Discord")
     local keyLink      = (type(config.KeyLink) == "string" and config.KeyLink ~= "") and config.KeyLink or nil
     local keyLinkText  = tostring(config.KeyLinkText or "🔑 Copy Link Lấy Key")
@@ -317,7 +332,8 @@ function AlatferaLib.CreateWindow(config)
         if writefile then pcall(function() writefile(configFile, HttpService:JSONEncode(savedData)) end) end
     end
 
-    if ParentContainer:FindFirstChild("AlatferaGui") then ParentContainer["AlatferaGui"]:Destroy() end
+    local oldGui = ParentContainer:FindFirstChild("AlatferaGui")
+    if oldGui then oldGui:Destroy() end
 
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "AlatferaGui"
@@ -330,7 +346,7 @@ function AlatferaLib.CreateWindow(config)
     local connections = {}
     local function Track(c) table.insert(connections, c); return c end
     local presetAppliers = {}
-    local modalCount = 0   -- > 0 khi có hộp xác nhận đang mở
+    local modalCount = 0
     local themeTargets = {}
 
     local function registerTheme(instance, property)
@@ -344,7 +360,7 @@ function AlatferaLib.CreateWindow(config)
 
     -- ============ KEY SYSTEM ============
     if useKeySystem then
-        local keyPassed = (savedData["_SavedKey"] == correctKey)
+        local keyPassed = rememberKey and (savedData["_SavedKey"] == correctKey)
         if not keyPassed then
             local KeyFrame = Instance.new("Frame")
             local keyH = keyLink and 262 or 220
@@ -355,7 +371,7 @@ function AlatferaLib.CreateWindow(config)
             KeyFrame.Parent = ScreenGui
             local KC = Instance.new("UICorner"); KC.CornerRadius = UDim.new(0, cornerRadius); KC.Parent = KeyFrame
             if enableStroke then
-                local KS = Instance.new("UIStroke"); KS.Color = strokeColor; KS.Thickness = 1.5; KS.Parent = KeyFrame
+                local KS = NewStroke(); KS.Color = strokeColor; KS.Thickness = 1.5; KS.Parent = KeyFrame
             end
             local kScale = Instance.new("UIScale"); kScale.Scale = 0.85; kScale.Parent = KeyFrame
             TweenService:Create(kScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
@@ -429,7 +445,7 @@ function AlatferaLib.CreateWindow(config)
                 Track(KeyLinkBtn.MouseButton1Click:Connect(function()
                     CopyToClipboard(keyLink)
                     if not (setclipboard or toclipboard) then
-                        StatusLabel.Text = keyLink   -- executor không có clipboard: hiện link ra để copy tay
+                        StatusLabel.Text = keyLink
                     end
                     KeyLinkBtn.Text = "✓ Đã Copy!"
                     task.wait(1.5)
@@ -457,8 +473,10 @@ function AlatferaLib.CreateWindow(config)
                 if KeyInput.Text == correctKey then
                     StatusLabel.Text = "✓ Key hợp lệ! Đang mở..."
                     StatusLabel.TextColor3 = Color3.fromRGB(45, 200, 110)
-                    savedData["_SavedKey"] = correctKey
-                    SaveCurrentConfig()
+                    if rememberKey then
+                        savedData["_SavedKey"] = correctKey
+                        SaveCurrentConfig()
+                    end
                     TweenService:Create(kScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
                     task.wait(0.3)
                     KeyFrame:Destroy()
@@ -504,7 +522,7 @@ function AlatferaLib.CreateWindow(config)
     LoadingFrame.Parent = ScreenGui
     local LC = Instance.new("UICorner"); LC.CornerRadius = UDim.new(0, cornerRadius); LC.Parent = LoadingFrame
     if enableStroke then
-        local LS = Instance.new("UIStroke"); LS.Color = strokeColor; LS.Thickness = 1.5; LS.Parent = LoadingFrame
+        local LS = NewStroke(); LS.Color = strokeColor; LS.Thickness = 1.5; LS.Parent = LoadingFrame
     end
     local lScale = Instance.new("UIScale"); lScale.Scale = 0.85; lScale.Parent = LoadingFrame
     TweenService:Create(lScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
@@ -542,7 +560,7 @@ function AlatferaLib.CreateWindow(config)
             ring.BackgroundTransparency = 1
             ring.Parent = LoadingFrame
             local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(1, 0); rc.Parent = ring
-            local rs = Instance.new("UIStroke"); rs.Color = themeColor; rs.Thickness = 2; rs.Parent = ring
+            local rs = NewStroke(); rs.Color = themeColor; rs.Thickness = 2; rs.Parent = ring
             TweenService:Create(ring, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 Size = UDim2.new(0, 50, 0, 50),
                 Position = UDim2.new(0.5, -25, 1, -43),
@@ -566,7 +584,7 @@ function AlatferaLib.CreateWindow(config)
 
     local MainFrame = Instance.new("Frame")
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    MainFrame.Size = UDim2.new(0.70, 0, 0.88, 0)
+    MainFrame.Size = UDim2.new(0.70, 0, 0.78, 0)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     MainFrame.BorderSizePixel = 0
@@ -574,11 +592,11 @@ function AlatferaLib.CreateWindow(config)
     MainFrame.Parent = ScreenGui
     local MC = Instance.new("UICorner"); MC.CornerRadius = UDim.new(0, cornerRadius); MC.Parent = MainFrame
     local MSize = Instance.new("UISizeConstraint")
-    MSize.MinSize = Vector2.new(380, 260)
-    MSize.MaxSize = Vector2.new(760, 480)
+    MSize.MinSize = Vector2.new(380, 240)
+    MSize.MaxSize = Vector2.new(760, 420)
     MSize.Parent = MainFrame
     if enableStroke then
-        local MS = Instance.new("UIStroke"); MS.Color = strokeColor; MS.Thickness = 2; MS.Parent = MainFrame
+        local MS = NewStroke(); MS.Color = strokeColor; MS.Thickness = 2; MS.Parent = MainFrame
     end
     local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
     TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
@@ -715,7 +733,6 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- Layout từ phải sang trái: ✕ | 📜 | 🔍 | 🔒 | ⌨ | ? | 📋 | 📥
     local function makeTopBtn(text, xOffset, color, size)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0, 34, 0, 34); b.Position = UDim2.new(1, xOffset, 0, 6)
@@ -762,7 +779,7 @@ function AlatferaLib.CreateWindow(config)
     SearchBox.Parent = Topbar
     local SrC = Instance.new("UICorner"); SrC.CornerRadius = UDim.new(0, 8); SrC.Parent = SearchBox
     if enableStroke then
-        local SrS = Instance.new("UIStroke"); SrS.Color = strokeColor; SrS.Thickness = 1; SrS.Parent = SearchBox
+        local SrS = NewStroke(); SrS.Color = strokeColor; SrS.Thickness = 1; SrS.Parent = SearchBox
     end
 
     local isSearchOpen = false
@@ -807,7 +824,7 @@ function AlatferaLib.CreateWindow(config)
     OpenBtnFrame.Visible = false; OpenBtnFrame.Parent = ScreenGui
     local OBC = Instance.new("UICorner"); OBC.CornerRadius = UDim.new(0, 16); OBC.Parent = OpenBtnFrame
     if enableStroke then
-        local OBS = Instance.new("UIStroke"); OBS.Color = themeColor; OBS.Transparency = 0.4; OBS.Thickness = 1; OBS.Parent = OpenBtnFrame
+        local OBS = NewStroke(); OBS.Color = themeColor; OBS.Transparency = 0.4; OBS.Thickness = 1; OBS.Parent = OpenBtnFrame
     end
     registerTheme(OpenBtnFrame, "TextColor3")
 
@@ -883,7 +900,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- ============ DRAG LOGIC (kéo bằng Topbar) ============
+    -- ============ DRAG LOGIC ============
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
         if isLocked or modalCount > 0 then return end
@@ -915,7 +932,7 @@ function AlatferaLib.CreateWindow(config)
     Sidebar.Parent = MainFrame
     local SbC = Instance.new("UICorner"); SbC.CornerRadius = UDim.new(0, cornerRadius); SbC.Parent = Sidebar
     if enableStroke then
-        local SbS = Instance.new("UIStroke"); SbS.Color = strokeColor; SbS.Thickness = 1; SbS.Parent = Sidebar
+        local SbS = NewStroke(); SbS.Color = strokeColor; SbS.Thickness = 1; SbS.Parent = Sidebar
     end
     local SbPad = Instance.new("UIPadding")
     SbPad.PaddingTop = UDim.new(0, 6); SbPad.PaddingLeft = UDim.new(0, 3); SbPad.Parent = Sidebar
@@ -934,7 +951,7 @@ function AlatferaLib.CreateWindow(config)
         PlaytimeFrame.Parent = MainFrame
         local PTC = Instance.new("UICorner"); PTC.CornerRadius = UDim.new(0, cornerRadius); PTC.Parent = PlaytimeFrame
         if enableStroke then
-            local PTS = Instance.new("UIStroke"); PTS.Color = strokeColor; PTS.Thickness = 1; PTS.Parent = PlaytimeFrame
+            local PTS = NewStroke(); PTS.Color = strokeColor; PTS.Thickness = 1; PTS.Parent = PlaytimeFrame
         end
         local PlaytimeLabel = Instance.new("TextLabel")
         PlaytimeLabel.Size = UDim2.new(1, 0, 1, 0); PlaytimeLabel.BackgroundTransparency = 1
@@ -963,7 +980,6 @@ function AlatferaLib.CreateWindow(config)
     ContentArea.Parent = MainFrame
 
     local FirstTab = true
-    local tabAccents = {}
 
     Track(SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(SearchBox.Text)
@@ -979,7 +995,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
--- ============ PROFILE CARD (avatar + tên) ============
+    -- ============ PROFILE CARD ============
     local function buildProfile(parent, cfg)
         cfg = cfg or {}
         local obj = {}
@@ -989,7 +1005,7 @@ function AlatferaLib.CreateWindow(config)
         F.Parent = parent
         local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(0, cornerRadius); FC.Parent = F
         if enableStroke then
-            local FS = Instance.new("UIStroke"); FS.Color = strokeColor; FS.Thickness = 1; FS.Parent = F
+            local FS = NewStroke(); FS.Color = strokeColor; FS.Thickness = 1; FS.Parent = F
         end
 
         local showAvatar = (cfg.ShowAvatar == nil) and true or cfg.ShowAvatar
@@ -1004,7 +1020,7 @@ function AlatferaLib.CreateWindow(config)
         Av.Visible = showAvatar
         Av.Parent = F
         local AvC = Instance.new("UICorner"); AvC.CornerRadius = UDim.new(1, 0); AvC.Parent = Av
-        local AvS = Instance.new("UIStroke"); AvS.Color = themeColor; AvS.Thickness = 1.5; AvS.Parent = Av
+        local AvS = NewStroke(); AvS.Color = themeColor; AvS.Thickness = 1.5; AvS.Parent = Av
         registerTheme(AvS, "Color")
 
         local function resolveImage(img)
@@ -1069,7 +1085,6 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
-    -- Hiện (hoặc tạo lại) thẻ avatar ở cuối thanh bên
     function Window:ShowProfile(cfg)
         if profileCard then profileCard.Frame:Destroy(); profileCard = nil end
         profileCard = buildProfile(MainFrame, cfg)
@@ -1088,7 +1103,6 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
-    -- Đổi nội dung thẻ: Window:SetProfile({Name=..., SubText=..., Image=...})
     function Window:SetProfile(cfg)
         cfg = cfg or {}
         if not profileCard then return Window:ShowProfile(cfg) end
@@ -1100,7 +1114,6 @@ function AlatferaLib.CreateWindow(config)
 
     function Window:GetProfile() return profileCard end
 
-    -- Khung avatar nổi riêng (không nằm trong thanh bên)
     function Window:CreateProfileFrame(cfg)
         cfg = cfg or {}
         local card = buildProfile(ScreenGui, cfg)
@@ -1139,7 +1152,7 @@ function AlatferaLib.CreateWindow(config)
         })
     end
 
-    -- ============ HỘP XÁC NHẬN (CONFIRM) ============
+    -- ============ CONFIRM BOX ============
     local confirmEnabled = (config.ConfirmEnabled == nil) and true or config.ConfirmEnabled
 
     function Window:SetConfirmEnabled(b) confirmEnabled = b and true or false end
@@ -1153,9 +1166,6 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
-    -- cfg: Title, Text, ConfirmText, CancelText, OnConfirm, OnCancel,
-    --      Buttons = { {Text=..., Callback=..., Close=true}, ... } (tối đa 8 nút thêm),
-    --      Danger (nút đồng ý màu đỏ), Color, CloseOnBackdrop
     function Window:Confirm(cfg)
         cfg = cfg or {}
         if not confirmEnabled then
@@ -1177,13 +1187,12 @@ function AlatferaLib.CreateWindow(config)
 
         modalCount = modalCount + 1
         local dialogW = 300
-        local textSize = TextService:GetTextSize(text, 13, Enum.Font.Gotham, Vector2.new(dialogW - 40, 1000))
+        local textSize = SafeTextSize(text, 13, Enum.Font.Gotham, Vector2.new(dialogW - 40, 1000))
         local extraY = 46 + textSize.Y + 14
         local extraH = math.min(#extra * 38, 152)
         local rowY = extraY + extraH + (#extra > 0 and 6 or 0)
         local dialogH = rowY + 36 + 16
 
-        -- Lớp nền chặn mọi thao tác phía sau
         local Backdrop = Instance.new("TextButton")
         Backdrop.Name = "ConfirmBackdrop"
         Backdrop.Size = UDim2.new(1, 0, 1, 0)
@@ -1208,7 +1217,7 @@ function AlatferaLib.CreateWindow(config)
         Dialog.Parent = Backdrop
         local DC = Instance.new("UICorner"); DC.CornerRadius = UDim.new(0, cornerRadius); DC.Parent = Dialog
         if enableStroke then
-            local DS = Instance.new("UIStroke"); DS.Color = strokeColor; DS.Thickness = 2; DS.Parent = Dialog
+            local DS = NewStroke(); DS.Color = strokeColor; DS.Thickness = 2; DS.Parent = Dialog
         end
         local dScale = Instance.new("UIScale"); dScale.Scale = 0.85; dScale.Parent = Dialog
         TweenService:Create(dScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
@@ -1262,7 +1271,6 @@ function AlatferaLib.CreateWindow(config)
             return B
         end
 
-        -- Các nút thêm (tùy người làm code)
         if #extra > 0 then
             local Ex = Instance.new("ScrollingFrame")
             Ex.Size = UDim2.new(1, -40, 0, extraH)
@@ -1286,7 +1294,6 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
-        -- Hai nút bắt buộc: Hủy và Đồng ý
         makeBtn(cancelText,
             UDim2.new(0, 20, 0, rowY), UDim2.new(0, 125, 0, 36),
             Color3.fromRGB(50, 56, 72),
@@ -1305,7 +1312,6 @@ function AlatferaLib.CreateWindow(config)
         return { Close = close }
     end
 
-    -- Dùng cho nút/công tắc: confirmCfg = true hoặc bảng cấu hình như Window:Confirm
     function Window:ConfirmAction(confirmCfg, fn)
         local cfg = {}
         if type(confirmCfg) == "table" then
@@ -1319,7 +1325,7 @@ function AlatferaLib.CreateWindow(config)
         return Window:Confirm(cfg)
     end
 
-        -- ============ NOTIFICATION SYSTEM (X + History) ============
+    -- ============ NOTIFICATION SYSTEM ============
     local notifHistory = {}
     local MAX_HISTORY = 50
 
@@ -1347,7 +1353,7 @@ function AlatferaLib.CreateWindow(config)
     HistoryPanel.Parent = ScreenGui
     local HPC = Instance.new("UICorner"); HPC.CornerRadius = UDim.new(0, cornerRadius); HPC.Parent = HistoryPanel
     if enableStroke then
-        local HPS = Instance.new("UIStroke"); HPS.Color = strokeColor; HPS.Thickness = 2; HPS.Parent = HistoryPanel
+        local HPS = NewStroke(); HPS.Color = strokeColor; HPS.Thickness = 2; HPS.Parent = HistoryPanel
     end
 
     local HPTitle = Instance.new("TextLabel")
@@ -1474,7 +1480,7 @@ function AlatferaLib.CreateWindow(config)
 
         addToHistory(title, text, nColor)
 
-        local textSize = TextService:GetTextSize(text, fs, Enum.Font.Gotham, Vector2.new(240, 1000))
+        local textSize = SafeTextSize(text, fs, Enum.Font.Gotham, Vector2.new(240, 1000))
         local itemH = math.max(54, 30 + textSize.Y)
 
         local Item = Instance.new("Frame")
@@ -1484,7 +1490,7 @@ function AlatferaLib.CreateWindow(config)
         Item.Parent = NotifContainer
         local ICC = Instance.new("UICorner"); ICC.CornerRadius = UDim.new(0, cornerRadius); ICC.Parent = Item
         if enableStroke then
-            local IS = Instance.new("UIStroke"); IS.Color = strokeColor; IS.Thickness = 1; IS.Parent = Item
+            local IS = NewStroke(); IS.Color = strokeColor; IS.Thickness = 1; IS.Parent = Item
         end
         local nScale = Instance.new("UIScale"); nScale.Scale = 0.7; nScale.Parent = Item
         TweenService:Create(nScale, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
@@ -1577,7 +1583,7 @@ function AlatferaLib.CreateWindow(config)
     PastePanel.Parent = ScreenGui
     local PPC = Instance.new("UICorner"); PPC.CornerRadius = UDim.new(0, cornerRadius); PPC.Parent = PastePanel
     if enableStroke then
-        local PPS = Instance.new("UIStroke"); PPS.Color = strokeColor; PPS.Thickness = 2; PPS.Parent = PastePanel
+        local PPS = NewStroke(); PPS.Color = strokeColor; PPS.Thickness = 2; PPS.Parent = PastePanel
     end
 
     local PPTitle = Instance.new("TextLabel")
@@ -1653,7 +1659,6 @@ function AlatferaLib.CreateWindow(config)
             PastePanel.Visible = false
             PPInput.Text = ""
         else
-            -- Code sai: xóa code đã dán và báo sai
             PPInput.Text = ""
             local msg = (res == "expired") and "Code đã hết hạn!" or "Code sai!"
             PPInput.PlaceholderText = "❌ " .. msg
@@ -1710,7 +1715,7 @@ function AlatferaLib.CreateWindow(config)
     TooltipFrame.Parent = ScreenGui
     local TTC = Instance.new("UICorner"); TTC.CornerRadius = UDim.new(0, 6); TTC.Parent = TooltipFrame
     if enableStroke then
-        local TTS = Instance.new("UIStroke"); TTS.Color = themeColor; TTS.Thickness = 1; TTS.Parent = TooltipFrame
+        local TTS = NewStroke(); TTS.Color = themeColor; TTS.Thickness = 1; TTS.Parent = TooltipFrame
         registerTheme(TTS, "Color")
     end
     local TooltipLabel = Instance.new("TextLabel")
@@ -1780,13 +1785,11 @@ function AlatferaLib.CreateWindow(config)
         configExpireDays = math.clamp(math.floor(tonumber(n) or 7), 1, 30)
     end
 
-    -- Trả về: code, số ngày hết hạn  (code = nil nếu chưa có cài đặt để chia sẻ)
     function Window:ExportConfig(days)
         local d = math.clamp(math.floor(tonumber(days) or configExpireDays), 1, 30)
         return EncodeConfigCode(configSecret, savedData, d), d
     end
 
-    -- Trả về: true, số cài đặt đã áp dụng  |  false, "invalid"/"expired"
     function Window:ImportConfig(code)
         local ok, res = DecodeConfigCode(configSecret, code)
         if not ok then return false, res end
@@ -1819,7 +1822,6 @@ function AlatferaLib.CreateWindow(config)
     function Window:GetTheme() return themeColor end
 
     -- ============ WIDGET BUILDER ============
-    -- Mọi widget nhận tham số fontSize cuối cùng (8-40)
     local function buildWidgets(container)
         local W = {}
 
@@ -1843,7 +1845,7 @@ function AlatferaLib.CreateWindow(config)
             L.Parent = container
             local LC = Instance.new("UICorner"); LC.CornerRadius = UDim.new(0, cornerRadius); LC.Parent = L
             if enableStroke then
-                local LS = Instance.new("UIStroke"); LS.Color = strokeColor; LS.Thickness = 1; LS.Parent = L
+                local LS = NewStroke(); LS.Color = strokeColor; LS.Thickness = 1; LS.Parent = L
             end
             L:SetAttribute("SearchText", string.lower(text))
             AddTooltip(L, tooltip or text)
@@ -1860,7 +1862,7 @@ function AlatferaLib.CreateWindow(config)
             Wrap.Parent = container
             local WC = Instance.new("UICorner"); WC.CornerRadius = UDim.new(0, cornerRadius); WC.Parent = Wrap
             if enableStroke then
-                local WS = Instance.new("UIStroke"); WS.Color = strokeColor; WS.Thickness = 1; WS.Parent = Wrap
+                local WS = NewStroke(); WS.Color = strokeColor; WS.Thickness = 1; WS.Parent = Wrap
             end
             local Pad = Instance.new("UIPadding")
             Pad.PaddingTop = UDim.new(0, 8); Pad.PaddingBottom = UDim.new(0, 8)
@@ -1911,7 +1913,6 @@ function AlatferaLib.CreateWindow(config)
             return SF
         end
 
-        -- CreateButton(text, callback, tooltip, fontSize)
         function W:CreateButton(btnText, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -1925,7 +1926,7 @@ function AlatferaLib.CreateWindow(config)
             B.Parent = container
             local BC3 = Instance.new("UICorner"); BC3.CornerRadius = UDim.new(0, cornerRadius); BC3.Parent = B
             if enableStroke then
-                local BS = Instance.new("UIStroke"); BS.Color = strokeColor; BS.Thickness = 1; BS.Parent = B
+                local BS = NewStroke(); BS.Color = strokeColor; BS.Thickness = 1; BS.Parent = B
             end
             B:SetAttribute("SearchText", string.lower(btnText))
             AttachButtonEffects(B, Track, Color3.fromRGB(34, 40, 56))
@@ -1944,7 +1945,6 @@ function AlatferaLib.CreateWindow(config)
             return B
         end
 
-        -- CreateToggle(text, flag, default, callback, tooltip, fontSize)
         function W:CreateToggle(toggleText, flagName, defaultState, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -1958,7 +1958,7 @@ function AlatferaLib.CreateWindow(config)
             T.Parent = container
             local TFC = Instance.new("UICorner"); TFC.CornerRadius = UDim.new(0, cornerRadius); TFC.Parent = T
             if enableStroke then
-                local TFS = Instance.new("UIStroke"); TFS.Color = strokeColor; TFS.Thickness = 1; TFS.Parent = T
+                local TFS = NewStroke(); TFS.Color = strokeColor; TFS.Thickness = 1; TFS.Parent = T
             end
             T:SetAttribute("SearchText", string.lower(toggleText))
             AttachButtonEffects(T, Track, Color3.fromRGB(30, 35, 48))
@@ -2013,7 +2013,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- CreateSlider(text, flag, min, max, default, callback, showInput, tooltip, fontSize)
         function W:CreateSlider(sliderText, flagName, minVal, maxVal, defaultVal, callback, showInput, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2028,7 +2027,7 @@ function AlatferaLib.CreateWindow(config)
             SF.Parent = container
             local SFC = Instance.new("UICorner"); SFC.CornerRadius = UDim.new(0, cornerRadius); SFC.Parent = SF
             if enableStroke then
-                local SFS = Instance.new("UIStroke"); SFS.Color = strokeColor; SFS.Thickness = 1; SFS.Parent = SF
+                local SFS = NewStroke(); SFS.Color = strokeColor; SFS.Thickness = 1; SFS.Parent = SF
             end
             SF:SetAttribute("SearchText", string.lower(sliderText))
             AddTooltip(SF, tooltip or sliderText)
@@ -2056,7 +2055,7 @@ function AlatferaLib.CreateWindow(config)
             registerTheme(VB, "TextColor3")
             local VStr = nil
             if showInput and enableStroke then
-                VStr = Instance.new("UIStroke"); VStr.Color = strokeColor; VStr.Thickness = 1; VStr.Parent = VB
+                VStr = NewStroke(); VStr.Color = strokeColor; VStr.Thickness = 1; VStr.Parent = VB
             end
             local Bar = Instance.new("TextButton")
             Bar.Size = UDim2.new(1, -28, 0, 7); Bar.Position = UDim2.new(0, 14, 0, fs + 18)
@@ -2079,7 +2078,7 @@ function AlatferaLib.CreateWindow(config)
             Thumb.BorderSizePixel = 0; Thumb.ZIndex = 3
             Thumb.Parent = Bar
             local THC = Instance.new("UICorner"); THC.CornerRadius = UDim.new(1, 0); THC.Parent = Thumb
-            local ThStr = Instance.new("UIStroke"); ThStr.Color = themeColor; ThStr.Thickness = 2; ThStr.Parent = Thumb
+            local ThStr = NewStroke(); ThStr.Color = themeColor; ThStr.Thickness = 2; ThStr.Parent = Thumb
             registerTheme(ThStr, "Color")
             local currentValue = defaultVal
             local sliding = false
@@ -2141,7 +2140,7 @@ function AlatferaLib.CreateWindow(config)
                 if isInputVisible then
                     VB.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
                     if not VStr and enableStroke then
-                        VStr = Instance.new("UIStroke"); VStr.Color = strokeColor; VStr.Thickness = 1; VStr.Parent = VB
+                        VStr = NewStroke(); VStr.Color = strokeColor; VStr.Thickness = 1; VStr.Parent = VB
                     elseif VStr then VStr.Enabled = true end
                 else
                     if VStr then VStr.Enabled = false end
@@ -2153,7 +2152,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- CreateDropdown(text, options, default, callback, tooltip, fontSize)
         function W:CreateDropdown(dropText, options, defaultOption, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2168,7 +2166,7 @@ function AlatferaLib.CreateWindow(config)
             DF.Parent = container
             local DFC = Instance.new("UICorner"); DFC.CornerRadius = UDim.new(0, cornerRadius); DFC.Parent = DF
             if enableStroke then
-                local DFS = Instance.new("UIStroke"); DFS.Color = strokeColor; DFS.Thickness = 1; DFS.Parent = DF
+                local DFS = NewStroke(); DFS.Color = strokeColor; DFS.Thickness = 1; DFS.Parent = DF
             end
             DF:SetAttribute("SearchText", string.lower(dropText))
             AddTooltip(DF, tooltip or dropText)
@@ -2241,7 +2239,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- CreateMultiDropdown(text, options, defaultSelected, callback, tooltip, fontSize)
         function W:CreateMultiDropdown(dropText, options, defaultSelected, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2269,7 +2266,7 @@ function AlatferaLib.CreateWindow(config)
             DF.Parent = container
             local DFC = Instance.new("UICorner"); DFC.CornerRadius = UDim.new(0, cornerRadius); DFC.Parent = DF
             if enableStroke then
-                local DFS = Instance.new("UIStroke"); DFS.Color = strokeColor; DFS.Thickness = 1; DFS.Parent = DF
+                local DFS = NewStroke(); DFS.Color = strokeColor; DFS.Thickness = 1; DFS.Parent = DF
             end
             DF:SetAttribute("SearchText", string.lower(dropText))
             AddTooltip(DF, tooltip or dropText)
@@ -2374,7 +2371,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- CreateColorPicker(text, flag, defaultColor, callback, tooltip, fontSize)
         function W:CreateColorPicker(pickerText, flagName, defaultColor, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2394,7 +2390,7 @@ function AlatferaLib.CreateWindow(config)
             PF.Parent = container
             local PFC = Instance.new("UICorner"); PFC.CornerRadius = UDim.new(0, cornerRadius); PFC.Parent = PF
             if enableStroke then
-                local PFS = Instance.new("UIStroke"); PFS.Color = strokeColor; PFS.Thickness = 1; PFS.Parent = PF
+                local PFS = NewStroke(); PFS.Color = strokeColor; PFS.Thickness = 1; PFS.Parent = PF
             end
             PF:SetAttribute("SearchText", string.lower(pickerText))
             AddTooltip(PF, tooltip or pickerText)
@@ -2413,7 +2409,7 @@ function AlatferaLib.CreateWindow(config)
             CBtn.Text = ""; CBtn.Parent = PF
             local CBC = Instance.new("UICorner"); CBC.CornerRadius = UDim.new(0, 6); CBC.Parent = CBtn
             if enableStroke then
-                local CBS = Instance.new("UIStroke"); CBS.Color = strokeColor; CBS.Thickness = 1; CBS.Parent = CBtn
+                local CBS = NewStroke(); CBS.Color = strokeColor; CBS.Thickness = 1; CBS.Parent = CBtn
             end
             local Panel = Instance.new("Frame")
             Panel.Size = UDim2.new(1, -10, 0, 0)
@@ -2424,7 +2420,7 @@ function AlatferaLib.CreateWindow(config)
             Panel.Parent = container
             local PC2 = Instance.new("UICorner"); PC2.CornerRadius = UDim.new(0, cornerRadius); PC2.Parent = Panel
             if enableStroke then
-                local PS = Instance.new("UIStroke"); PS.Color = strokeColor; PS.Thickness = 1; PS.Parent = Panel
+                local PS = NewStroke(); PS.Color = strokeColor; PS.Thickness = 1; PS.Parent = Panel
             end
             local Preview = Instance.new("Frame")
             Preview.Size = UDim2.new(1, -20, 0, 30); Preview.Position = UDim2.new(0, 10, 0, 10)
@@ -2551,7 +2547,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- CreateTextbox(text, flag, maxChars, callback, tooltip, fontSize)
         function W:CreateTextbox(boxText, flagName, maxChars, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2564,7 +2559,7 @@ function AlatferaLib.CreateWindow(config)
             BF.Parent = container
             local BFC = Instance.new("UICorner"); BFC.CornerRadius = UDim.new(0, cornerRadius); BFC.Parent = BF
             if enableStroke then
-                local BFS = Instance.new("UIStroke"); BFS.Color = strokeColor; BFS.Thickness = 1; BFS.Parent = BF
+                local BFS = NewStroke(); BFS.Color = strokeColor; BFS.Thickness = 1; BFS.Parent = BF
             end
             BF:SetAttribute("SearchText", string.lower(boxText))
             AddTooltip(BF, tooltip or boxText)
@@ -2614,7 +2609,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- CreateKeybind(text, flag, defaultKey, callback, tooltip, fontSize)
         function W:CreateKeybind(labelText, flagName, defaultKey, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2630,7 +2624,7 @@ function AlatferaLib.CreateWindow(config)
             BF.Parent = container
             local BKC = Instance.new("UICorner"); BKC.CornerRadius = UDim.new(0, cornerRadius); BKC.Parent = BF
             if enableStroke then
-                local BKS = Instance.new("UIStroke"); BKS.Color = strokeColor; BKS.Thickness = 1; BKS.Parent = BF
+                local BKS = NewStroke(); BKS.Color = strokeColor; BKS.Thickness = 1; BKS.Parent = BF
             end
             BF:SetAttribute("SearchText", string.lower(labelText))
             AddTooltip(BF, tooltip or labelText)
@@ -2690,7 +2684,6 @@ function AlatferaLib.CreateWindow(config)
             }
         end
 
-        -- CreateProgressBar(text, initialPercent, tooltip, fontSize)
         function W:CreateProgressBar(labelText, initialPercent, tooltip, fontSize)
             local fs = getFontSize(fontSize, 13)
             local pct = math.clamp(initialPercent or 0, 0, 100)
@@ -2701,7 +2694,7 @@ function AlatferaLib.CreateWindow(config)
             PF.Parent = container
             local PFC = Instance.new("UICorner"); PFC.CornerRadius = UDim.new(0, cornerRadius); PFC.Parent = PF
             if enableStroke then
-                local PFS = Instance.new("UIStroke"); PFS.Color = strokeColor; PFS.Thickness = 1; PFS.Parent = PF
+                local PFS = NewStroke(); PFS.Color = strokeColor; PFS.Thickness = 1; PFS.Parent = PF
             end
             PF:SetAttribute("SearchText", string.lower(labelText))
             AddTooltip(PF, tooltip or labelText)
@@ -2743,7 +2736,6 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
-        -- CreateImage(imageId, height)
         function W:CreateImage(imageId, height)
             if not imageId then return nil end
             local h = height or 100
@@ -2755,7 +2747,7 @@ function AlatferaLib.CreateWindow(config)
             IF.Parent = container
             local IFC = Instance.new("UICorner"); IFC.CornerRadius = UDim.new(0, cornerRadius); IFC.Parent = IF
             if enableStroke then
-                local IFS = Instance.new("UIStroke"); IFS.Color = strokeColor; IFS.Thickness = 1; IFS.Parent = IF
+                local IFS = NewStroke(); IFS.Color = strokeColor; IFS.Thickness = 1; IFS.Parent = IF
             end
             local Img = Instance.new("ImageLabel")
             Img.Size = UDim2.new(1, -16, 1, -16)
@@ -2771,33 +2763,31 @@ function AlatferaLib.CreateWindow(config)
         return W
     end
 
-    -- ============ CREATE TAB ============
+    -- ============ CREATE TAB (IMPROVED - NO VERTICAL LINE) ============
     function Window:CreateTab(tabName, iconEmoji)
         local displayText = iconEmoji and (iconEmoji .. "  " .. tabName) or ("  " .. tabName)
         local TB = Instance.new("TextButton")
         TB.Size = UDim2.new(1, -6, 0, 36)
-        TB.BackgroundColor3 = FirstTab and Color3.fromRGB(28, 33, 46) or Color3.fromRGB(19, 21, 28)
+        TB.BackgroundColor3 = FirstTab and Color3.fromRGB(32, 38, 52) or Color3.fromRGB(19, 21, 28)
         TB.Text = displayText
         TB.TextColor3 = FirstTab and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(140, 145, 160)
         TB.TextXAlignment = Enum.TextXAlignment.Left
         TB.Font = Enum.Font.GothamBold; TB.TextSize = 13
         TB.AutoButtonColor = false
         TB.Parent = Sidebar
-        local TBPad = Instance.new("UIPadding"); TBPad.PaddingLeft = UDim.new(0, 10); TBPad.Parent = TB
-        local TabAccent = Instance.new("Frame")
-        TabAccent.Size = UDim2.new(0, 3, 0.6, 0)
-        TabAccent.Position = UDim2.new(0, 3, 0.2, 0)
-        TabAccent.BackgroundColor3 = themeColor
-        TabAccent.BorderSizePixel = 0
-        TabAccent.Visible = FirstTab
-        TabAccent.Parent = TB
-        local TAC = Instance.new("UICorner"); TAC.CornerRadius = UDim.new(1, 0); TAC.Parent = TabAccent
-        registerTheme(TabAccent, "BackgroundColor3")
-        tabAccents[TB] = TabAccent
+        
+        local TBPad = Instance.new("UIPadding"); TBPad.PaddingLeft = UDim.new(0, 12); TBPad.Parent = TB
         local TBC = Instance.new("UICorner"); TBC.CornerRadius = UDim.new(0, cornerRadius); TBC.Parent = TB
+        
+        local tabStroke = nil
         if enableStroke then
-            local TBS = Instance.new("UIStroke"); TBS.Color = strokeColor; TBS.Thickness = 1; TBS.Parent = TB
+            tabStroke = NewStroke()
+            tabStroke.Color = FirstTab and themeColor or strokeColor
+            tabStroke.Thickness = FirstTab and 1.5 or 1
+            tabStroke.Parent = TB
+            registerTheme(tabStroke, "Color")
         end
+
         local TabC = Instance.new("ScrollingFrame")
         TabC.Size = UDim2.new(1, 0, 1, 0)
         TabC.BackgroundTransparency = 1
@@ -2806,41 +2796,54 @@ function AlatferaLib.CreateWindow(config)
         TabC.CanvasSize = UDim2.new(0, 0, 0, 0)
         TabC.Visible = FirstTab
         TabC.Parent = ContentArea
+        
         local CL = Instance.new("UIListLayout")
         CL.Padding = UDim.new(0, 10); CL.SortOrder = Enum.SortOrder.LayoutOrder
         CL.Parent = TabC
+        
         Track(CL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             TabC.CanvasSize = UDim2.new(0, 0, 0, CL.AbsoluteContentSize.Y + 15)
         end))
+
         Track(TB.MouseEnter:Connect(function()
             if not TabC.Visible then
                 TweenService:Create(TB, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(24, 28, 40)}):Play()
             end
         end))
+        
         Track(TB.MouseLeave:Connect(function()
             if not TabC.Visible then
                 TweenService:Create(TB, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(19, 21, 28)}):Play()
             end
         end))
+
         Track(TB.MouseButton1Click:Connect(function()
             for _, child in pairs(ContentArea:GetChildren()) do
                 if child:IsA("ScrollingFrame") then child.Visible = false end
             end
             for _, btn in pairs(Sidebar:GetChildren()) do
                 if btn:IsA("TextButton") then
-                    btn.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
+                    TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(19, 21, 28)}):Play()
                     btn.TextColor3 = Color3.fromRGB(140, 145, 160)
+                    local st = btn:FindFirstChildOfClass("UIStroke")
+                    if st then st.Color = strokeColor; st.Thickness = 1 end
                 end
             end
-            for _, a in pairs(tabAccents) do a.Visible = false end
-            TabAccent.Visible = true
+            
             TabC.Visible = true
-            TB.BackgroundColor3 = Color3.fromRGB(28, 33, 46)
+            TweenService:Create(TB, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(32, 38, 52)}):Play()
             TB.TextColor3 = Color3.fromRGB(255, 255, 255)
+            if tabStroke then
+                tabStroke.Color = themeColor
+                tabStroke.Thickness = 1.5
+            end
+
             TabC.Position = UDim2.new(0.06, 0, 0, 0)
             TweenService:Create(TabC, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
         end))
+        
         FirstTab = false
+
         local Tab = buildWidgets(TabC)
         function Tab:CreateSubTab(subName)
             local SB = Instance.new("Frame")
@@ -2850,7 +2853,7 @@ function AlatferaLib.CreateWindow(config)
             SB.Parent = TabC
             local SBC = Instance.new("UICorner"); SBC.CornerRadius = UDim.new(0, cornerRadius); SBC.Parent = SB
             if enableStroke then
-                local SBS = Instance.new("UIStroke"); SBS.Color = strokeColor; SBS.Thickness = 1; SBS.Parent = SB
+                local SBS = NewStroke(); SBS.Color = strokeColor; SBS.Thickness = 1; SBS.Parent = SB
             end
             local SBL = Instance.new("UIListLayout")
             SBL.FillDirection = Enum.FillDirection.Horizontal
