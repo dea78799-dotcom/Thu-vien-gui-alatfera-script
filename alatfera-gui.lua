@@ -1,8 +1,7 @@
 --[[
     ============================================
-    ALATFERA LIB V14 - PRO EDITION (FIXED & IMPROVED)
+    ALATFERA LIB V14 - PRO EDITION (FIXED + Rainbow Stroke, Reset Config, Discord Webhook)
     Notify X, History, Mini Search, Copy/Paste Config
-    Custom Selected Tab Style (No Vertical Line)
     ============================================
 ]]
 
@@ -19,6 +18,7 @@ local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
 local Stats = game:GetService("Stats")
 local Lighting = game:GetService("Lighting")
+local RequestFunc = (syn and syn.request) or http_request or (http and http.request) or request
 
 local ParentContainer = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
@@ -33,14 +33,14 @@ local ColorPresets = {
     neon    = Color3.fromRGB(57, 255, 20),   dark    = Color3.fromRGB(15, 17, 23),
 }
 
--- Viền luôn bo theo khung
+-- Viền luôn bo theo khung (mặc định của Roblox sẽ viền chữ nếu nằm trong nút/nhãn)
 local function NewStroke()
     local st = Instance.new("UIStroke")
     st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     return st
 end
 
--- Đo chữ an toàn
+-- Đo chữ an toàn: nếu GetTextSize lỗi thì ước lượng
 local function SafeTextSize(text, size, font, bounds)
     local ok, res = pcall(function() return TextService:GetTextSize(text, size, font, bounds) end)
     if ok and res then return res end
@@ -78,6 +78,7 @@ local function GetFromClipboard()
 end
 
 -- ============ CONFIG CODE: mã hóa + chống sửa + hết hạn ============
+-- Code chỉ gồm chữ, số và 4 ký hiệu ( ) ! ?
 local CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?"
 local CODE_DECODE = {}
 for i = 1, #CODE_ALPHABET do CODE_DECODE[CODE_ALPHABET:sub(i, i)] = i - 1 end
@@ -178,6 +179,7 @@ local function codeToBytes(code)
     return table.concat(out)
 end
 
+-- Chỉ nhận giá trị an toàn: boolean, number, string ngắn, bảng 3 số (màu)
 local function cleanSnapshot(src)
     local snap, count = {}, 0
     if type(src) ~= "table" then return snap, 0 end
@@ -201,6 +203,7 @@ local function cleanSnapshot(src)
     return snap, count
 end
 
+-- Chia code thành 2-9 dòng cho dễ nhìn
 local function formatCodeLines(code)
     local len = #code
     local width = math.max(64, math.ceil(len / 9))
@@ -221,6 +224,7 @@ local function EncodeConfigCode(secret, snapshot, days)
     return formatCodeLines("(" .. bytesToCode(raw) .. ")")
 end
 
+-- Trả về: true, bảng cài đặt  |  false, "invalid"  |  false, "expired"
 local function DecodeConfigCode(secret, text)
     local flat = tostring(text or ""):gsub("%s", "")
     if #flat < 20 or #flat > CODE_MAX_LEN then return false, "invalid" end
@@ -307,8 +311,8 @@ function AlatferaLib.CreateWindow(config)
     local useKeySystem = config.KeySystem or false
     local correctKey   = config.Key or "AlatferaKey123"
     local discordLink  = config.DiscordLink or "https://discord.gg/alatfera"
-    local rememberKey  = (config.RememberKey == nil) and true or config.RememberKey
-    local discordShow  = (config.DiscordLink ~= false)
+    local rememberKey  = (config.RememberKey == nil) and true or config.RememberKey   -- false = luôn hỏi key mỗi lần
+    local discordShow  = (config.DiscordLink ~= false)   -- DiscordLink = false: ẩn nút Discord
     local discordText  = tostring(config.DiscordText or "📋 Copy Discord")
     local keyLink      = (type(config.KeyLink) == "string" and config.KeyLink ~= "") and config.KeyLink or nil
     local keyLinkText  = tostring(config.KeyLinkText or "🔑 Copy Link Lấy Key")
@@ -346,7 +350,7 @@ function AlatferaLib.CreateWindow(config)
     local connections = {}
     local function Track(c) table.insert(connections, c); return c end
     local presetAppliers = {}
-    local modalCount = 0
+    local modalCount = 0   -- > 0 khi có hộp xác nhận đang mở
     local themeTargets = {}
 
     local function registerTheme(instance, property)
@@ -445,7 +449,7 @@ function AlatferaLib.CreateWindow(config)
                 Track(KeyLinkBtn.MouseButton1Click:Connect(function()
                     CopyToClipboard(keyLink)
                     if not (setclipboard or toclipboard) then
-                        StatusLabel.Text = keyLink
+                        StatusLabel.Text = keyLink   -- executor không có clipboard: hiện link ra để copy tay
                     end
                     KeyLinkBtn.Text = "✓ Đã Copy!"
                     task.wait(1.5)
@@ -595,11 +599,50 @@ function AlatferaLib.CreateWindow(config)
     MSize.MinSize = Vector2.new(380, 240)
     MSize.MaxSize = Vector2.new(760, 420)
     MSize.Parent = MainFrame
+    local mainStroke = nil
+    local rainbowGradient = nil
+    local rainbowConn = nil
     if enableStroke then
-        local MS = NewStroke(); MS.Color = strokeColor; MS.Thickness = 2; MS.Parent = MainFrame
+        mainStroke = NewStroke(); mainStroke.Color = strokeColor; mainStroke.Thickness = 2; mainStroke.Parent = MainFrame
+        rainbowGradient = Instance.new("UIGradient")
+        rainbowGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(0.16, Color3.fromRGB(255, 127, 0)),
+            ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 255, 0)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 0)),
+            ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 255, 255)),
+            ColorSequenceKeypoint.new(0.83, Color3.fromRGB(0, 0, 255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0)),   -- trùng màu đầu để vòng xoay liền mạch
+        })
+        rainbowGradient.Enabled = false
+        rainbowGradient.Parent = mainStroke
     end
     local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
     TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+
+    -- Bật/tắt viền cầu vồng chạy vòng quanh cửa sổ (cần Stroke = true)
+    function Window:SetRainbowStroke(enabled)
+        if not rainbowGradient then return false end
+        if enabled then
+            mainStroke.Color = Color3.fromRGB(255, 255, 255)   -- gradient nhân với màu gốc nên màu gốc phải là trắng
+            rainbowGradient.Enabled = true
+            if not rainbowConn then
+                rainbowConn = RunService.RenderStepped:Connect(function()
+                    rainbowGradient.Rotation = (tick() * 90) % 360
+                end)
+                Track(rainbowConn)
+            end
+        else
+            rainbowGradient.Enabled = false
+            mainStroke.Color = strokeColor
+            if rainbowConn then rainbowConn:Disconnect(); rainbowConn = nil end
+        end
+        return true
+    end
+    function Window:IsRainbowStroke()
+        return rainbowGradient ~= nil and rainbowGradient.Enabled
+    end
+    if config.RainbowStroke then Window:SetRainbowStroke(true) end
 
     local savedBlurState = enableBlur
     local savedParticleState = enableParticles
@@ -733,6 +776,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
+    -- Layout từ phải sang trái: ✕ | 📜 | 🔍 | 🔒 | ⌨ | ? | 📋 | 📥
     local function makeTopBtn(text, xOffset, color, size)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0, 34, 0, 34); b.Position = UDim2.new(1, xOffset, 0, 6)
@@ -900,7 +944,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- ============ DRAG LOGIC ============
+    -- ============ DRAG LOGIC (kéo bằng Topbar) ============
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
         if isLocked or modalCount > 0 then return end
@@ -980,6 +1024,9 @@ function AlatferaLib.CreateWindow(config)
     ContentArea.Parent = MainFrame
 
     local FirstTab = true
+    local tabStrokes = {}
+    local selectedTab = { btn = nil, stroke = nil }
+    local function tabTint(c) return Color3.fromRGB(24, 28, 40):Lerp(c, 0.22) end
 
     Track(SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         local query = string.lower(SearchBox.Text)
@@ -995,7 +1042,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
-    -- ============ PROFILE CARD ============
+-- ============ PROFILE CARD (avatar + tên) ============
     local function buildProfile(parent, cfg)
         cfg = cfg or {}
         local obj = {}
@@ -1085,6 +1132,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
+    -- Hiện (hoặc tạo lại) thẻ avatar ở cuối thanh bên
     function Window:ShowProfile(cfg)
         if profileCard then profileCard.Frame:Destroy(); profileCard = nil end
         profileCard = buildProfile(MainFrame, cfg)
@@ -1103,6 +1151,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
+    -- Đổi nội dung thẻ: Window:SetProfile({Name=..., SubText=..., Image=...})
     function Window:SetProfile(cfg)
         cfg = cfg or {}
         if not profileCard then return Window:ShowProfile(cfg) end
@@ -1114,6 +1163,7 @@ function AlatferaLib.CreateWindow(config)
 
     function Window:GetProfile() return profileCard end
 
+    -- Khung avatar nổi riêng (không nằm trong thanh bên)
     function Window:CreateProfileFrame(cfg)
         cfg = cfg or {}
         local card = buildProfile(ScreenGui, cfg)
@@ -1152,7 +1202,7 @@ function AlatferaLib.CreateWindow(config)
         })
     end
 
-    -- ============ CONFIRM BOX ============
+    -- ============ HỘP XÁC NHẬN (CONFIRM) ============
     local confirmEnabled = (config.ConfirmEnabled == nil) and true or config.ConfirmEnabled
 
     function Window:SetConfirmEnabled(b) confirmEnabled = b and true or false end
@@ -1166,6 +1216,9 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
+    -- cfg: Title, Text, ConfirmText, CancelText, OnConfirm, OnCancel,
+    --      Buttons = { {Text=..., Callback=..., Close=true}, ... } (tối đa 8 nút thêm),
+    --      Danger (nút đồng ý màu đỏ), Color, CloseOnBackdrop
     function Window:Confirm(cfg)
         cfg = cfg or {}
         if not confirmEnabled then
@@ -1193,6 +1246,7 @@ function AlatferaLib.CreateWindow(config)
         local rowY = extraY + extraH + (#extra > 0 and 6 or 0)
         local dialogH = rowY + 36 + 16
 
+        -- Lớp nền chặn mọi thao tác phía sau
         local Backdrop = Instance.new("TextButton")
         Backdrop.Name = "ConfirmBackdrop"
         Backdrop.Size = UDim2.new(1, 0, 1, 0)
@@ -1271,6 +1325,7 @@ function AlatferaLib.CreateWindow(config)
             return B
         end
 
+        -- Các nút thêm (tùy người làm code)
         if #extra > 0 then
             local Ex = Instance.new("ScrollingFrame")
             Ex.Size = UDim2.new(1, -40, 0, extraH)
@@ -1294,6 +1349,7 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
+        -- Hai nút bắt buộc: Hủy và Đồng ý
         makeBtn(cancelText,
             UDim2.new(0, 20, 0, rowY), UDim2.new(0, 125, 0, 36),
             Color3.fromRGB(50, 56, 72),
@@ -1312,6 +1368,7 @@ function AlatferaLib.CreateWindow(config)
         return { Close = close }
     end
 
+    -- Dùng cho nút/công tắc: confirmCfg = true hoặc bảng cấu hình như Window:Confirm
     function Window:ConfirmAction(confirmCfg, fn)
         local cfg = {}
         if type(confirmCfg) == "table" then
@@ -1325,7 +1382,7 @@ function AlatferaLib.CreateWindow(config)
         return Window:Confirm(cfg)
     end
 
-    -- ============ NOTIFICATION SYSTEM ============
+        -- ============ NOTIFICATION SYSTEM (X + History) ============
     local notifHistory = {}
     local MAX_HISTORY = 50
 
@@ -1659,6 +1716,7 @@ function AlatferaLib.CreateWindow(config)
             PastePanel.Visible = false
             PPInput.Text = ""
         else
+            -- Code sai: xóa code đã dán và báo sai
             PPInput.Text = ""
             local msg = (res == "expired") and "Code đã hết hạn!" or "Code sai!"
             PPInput.PlaceholderText = "❌ " .. msg
@@ -1785,11 +1843,13 @@ function AlatferaLib.CreateWindow(config)
         configExpireDays = math.clamp(math.floor(tonumber(n) or 7), 1, 30)
     end
 
+    -- Trả về: code, số ngày hết hạn  (code = nil nếu chưa có cài đặt để chia sẻ)
     function Window:ExportConfig(days)
         local d = math.clamp(math.floor(tonumber(days) or configExpireDays), 1, 30)
         return EncodeConfigCode(configSecret, savedData, d), d
     end
 
+    -- Trả về: true, số cài đặt đã áp dụng  |  false, "invalid"/"expired"
     function Window:ImportConfig(code)
         local ok, res = DecodeConfigCode(configSecret, code)
         if not ok then return false, res end
@@ -1809,6 +1869,10 @@ function AlatferaLib.CreateWindow(config)
         themeColor = c
         Window.ThemeColor = c
         Sidebar.ScrollBarImageColor3 = c
+        if selectedTab.btn then
+            selectedTab.btn.BackgroundColor3 = tabTint(c)
+            if selectedTab.stroke then selectedTab.stroke.Color = c end
+        end
         for _, entry in ipairs(themeTargets) do
             pcall(function()
                 TweenService:Create(entry.obj, TweenInfo.new(0.35, Enum.EasingStyle.Quart), {[entry.prop] = c}):Play()
@@ -1822,6 +1886,7 @@ function AlatferaLib.CreateWindow(config)
     function Window:GetTheme() return themeColor end
 
     -- ============ WIDGET BUILDER ============
+    -- Mọi widget nhận tham số fontSize cuối cùng (8-40)
     local function buildWidgets(container)
         local W = {}
 
@@ -1830,6 +1895,191 @@ function AlatferaLib.CreateWindow(config)
                 return math.clamp(param, 8, 40)
             end
             return default
+        end
+
+        -- Nút reset cấu hình: CreateResetConfigButton(tên, callbackThêm, confirm, chữNút)
+        -- confirm: mặc định hỏi lại trước khi xóa; truyền false để không hỏi
+        function W:CreateResetConfigButton(customText, callback, confirmCfg, buttonText)
+            customText = customText or "Reset cấu hình"
+            buttonText = buttonText or "bấm"
+            if confirmCfg == nil then
+                confirmCfg = {
+                    Title = "Reset cấu hình",
+                    Text = "Xóa toàn bộ cấu hình đã lưu? Không thể hoàn tác.",
+                    ConfirmText = "Xóa",
+                    CancelText = "Hủy",
+                }
+            end
+
+            local function doReset()
+                local keepKey = savedData["_SavedKey"]   -- giữ key đã nhập, chỉ xóa cài đặt
+                for k in pairs(savedData) do savedData[k] = nil end
+                savedData["_SavedKey"] = keepKey
+                SaveCurrentConfig()
+                Window:Notify({ Title = "Thành Công", Text = "Đã xóa cấu hình đã lưu. Mở lại script để về mặc định.", Type = "success" })
+                if callback then
+                    local ok, err = pcall(callback)
+                    if not ok then warn("[Alatfera] Loi callback reset: " .. tostring(err)) end
+                end
+            end
+
+            local F = Instance.new("Frame")
+            F.Size = UDim2.new(1, -10, 0, 48)
+            F.BackgroundColor3 = Color3.fromRGB(92, 138, 114)
+            F.BorderSizePixel = 0
+            F.Parent = container
+            local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(0, cornerRadius); FC.Parent = F
+            F:SetAttribute("SearchText", string.lower(customText))
+
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size = UDim2.new(0.6, -10, 1, 0); Lbl.Position = UDim2.new(0, 14, 0, 0)
+            Lbl.BackgroundTransparency = 1; Lbl.Text = customText
+            Lbl.TextColor3 = Color3.fromRGB(15, 17, 23)
+            Lbl.Font = Enum.Font.GothamBold; Lbl.TextSize = 13
+            Lbl.TextXAlignment = Enum.TextXAlignment.Left
+            Lbl.Parent = F
+
+            local ActionBtn = Instance.new("TextButton")
+            ActionBtn.Size = UDim2.new(0, 75, 0, 32); ActionBtn.Position = UDim2.new(1, -85, 0.5, -16)
+            ActionBtn.BackgroundColor3 = Color3.fromRGB(215, 215, 215)
+            ActionBtn.Text = buttonText
+            ActionBtn.TextColor3 = Color3.fromRGB(15, 17, 23)
+            ActionBtn.Font = Enum.Font.GothamBold; ActionBtn.TextSize = 12
+            ActionBtn.AutoButtonColor = false
+            ActionBtn.Parent = F
+            local ABC = Instance.new("UICorner"); ABC.CornerRadius = UDim.new(0, 8); ABC.Parent = ActionBtn
+            AttachButtonEffects(ActionBtn, Track, Color3.fromRGB(235, 235, 235))
+
+            Track(ActionBtn.MouseButton1Click:Connect(function()
+                CreateRipple(ActionBtn)
+                if confirmCfg and Window:IsConfirmEnabled() then
+                    Window:ConfirmAction(confirmCfg, doReset)
+                else
+                    doReset()
+                end
+            end))
+            return F
+        end
+
+        -- Khung gửi ghi chú về Discord:
+        -- CreateDiscordWebhookWidget({ Title, WebhookUrl, Placeholder, ButtonText, Cooldown = 10, MaxLength = 900, IncludePlayerInfo = true })
+        function W:CreateDiscordWebhookWidget(cfg)
+            cfg = cfg or {}
+            local widgetTitle = tostring(cfg.Title or "Thông báo về discord")
+            local webhookUrl = tostring(cfg.WebhookUrl or "")
+            local placeholder = tostring(cfg.Placeholder or "Ghi chú vào đây")
+            local sendText = tostring(cfg.ButtonText or "Gửi")
+            local cooldown = tonumber(cfg.Cooldown) or 10
+            local maxLen = math.clamp(math.floor(tonumber(cfg.MaxLength) or 900), 1, 1000)
+            local includeInfo = (cfg.IncludePlayerInfo == nil) and true or cfg.IncludePlayerInfo
+
+            local OuterF = Instance.new("Frame")
+            OuterF.Size = UDim2.new(1, -10, 0, 96)
+            OuterF.BackgroundColor3 = Color3.fromRGB(92, 138, 114)
+            OuterF.BorderSizePixel = 0
+            OuterF.Parent = container
+            local OFC = Instance.new("UICorner"); OFC.CornerRadius = UDim.new(0, cornerRadius); OFC.Parent = OuterF
+            OuterF:SetAttribute("SearchText", string.lower(widgetTitle))
+
+            local HeaderF = Instance.new("Frame")
+            HeaderF.Size = UDim2.new(1, 0, 0, 42)
+            HeaderF.BackgroundColor3 = Color3.fromRGB(72, 112, 92)
+            HeaderF.BorderSizePixel = 0
+            HeaderF.Parent = OuterF
+            local HFC = Instance.new("UICorner"); HFC.CornerRadius = UDim.new(0, cornerRadius); HFC.Parent = HeaderF
+
+            local TitleL = Instance.new("TextLabel")
+            TitleL.Size = UDim2.new(0.6, 0, 1, 0); TitleL.Position = UDim2.new(0, 14, 0, 0)
+            TitleL.BackgroundTransparency = 1; TitleL.Text = widgetTitle
+            TitleL.TextColor3 = Color3.fromRGB(15, 17, 23)
+            TitleL.Font = Enum.Font.GothamBold; TitleL.TextSize = 12
+            TitleL.TextXAlignment = Enum.TextXAlignment.Left
+            TitleL.Parent = HeaderF
+
+            local SendBtn = Instance.new("TextButton")
+            SendBtn.Size = UDim2.new(0, 65, 0, 28); SendBtn.Position = UDim2.new(1, -75, 0.5, -14)
+            SendBtn.BackgroundColor3 = Color3.fromRGB(92, 138, 114)
+            SendBtn.Text = sendText
+            SendBtn.TextColor3 = Color3.fromRGB(15, 17, 23)
+            SendBtn.Font = Enum.Font.GothamBold; SendBtn.TextSize = 12
+            SendBtn.AutoButtonColor = false
+            SendBtn.Parent = HeaderF
+            local SBC = Instance.new("UICorner"); SBC.CornerRadius = UDim.new(0, 8); SBC.Parent = SendBtn
+            AttachButtonEffects(SendBtn, Track, Color3.fromRGB(112, 158, 134))
+
+            local InputBox = Instance.new("TextBox")
+            InputBox.Size = UDim2.new(1, -20, 0, 36); InputBox.Position = UDim2.new(0, 10, 0, 50)
+            InputBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            InputBox.Text = ""
+            InputBox.PlaceholderText = placeholder
+            InputBox.TextColor3 = Color3.fromRGB(15, 17, 23)
+            InputBox.PlaceholderColor3 = Color3.fromRGB(120, 125, 140)
+            InputBox.Font = Enum.Font.Gotham; InputBox.TextSize = 12
+            InputBox.ClearTextOnFocus = false
+            InputBox.Parent = OuterF
+            local IBC = Instance.new("UICorner"); IBC.CornerRadius = UDim.new(0, 18); IBC.Parent = InputBox
+
+            local lastSend = -math.huge
+            local sending = false
+            Track(SendBtn.MouseButton1Click:Connect(function()
+                CreateRipple(SendBtn)
+                if sending then return end
+                if webhookUrl == "" then
+                    Window:Notify({ Title = "Lỗi", Text = "Chưa cấu hình Discord Webhook URL!", Type = "error" })
+                    return
+                end
+                if not RequestFunc then
+                    Window:Notify({ Title = "Lỗi", Text = "Executor không hỗ trợ gửi request.", Type = "error" })
+                    return
+                end
+                local remain = cooldown - (tick() - lastSend)
+                if remain > 0 then
+                    Window:Notify({ Title = "Chờ chút", Text = "Thử lại sau " .. math.ceil(remain) .. " giây.", Type = "warning" })
+                    return
+                end
+
+                local noteText = InputBox.Text
+                if noteText:gsub("%s", "") == "" then noteText = "(Không có ghi chú)" end
+
+                local fields = {}
+                if includeInfo then
+                    fields[#fields + 1] = { name = "👤 Tên người chơi", value = LocalPlayer.Name .. " (" .. LocalPlayer.DisplayName .. ")", inline = true }
+                    fields[#fields + 1] = { name = "🆔 User ID", value = tostring(LocalPlayer.UserId), inline = true }
+                end
+                fields[#fields + 1] = { name = "📝 Nội dung ghi chú", value = string.sub(noteText, 1, maxLen), inline = false }
+                fields[#fields + 1] = { name = "⏰ Thời gian", value = os.date("%Y-%m-%d %H:%M:%S"), inline = false }
+
+                local body = {
+                    content = "",
+                    embeds = {{ title = "🚀 " .. widgetTitle, color = 3447003, fields = fields }},
+                    allowed_mentions = { parse = {} },   -- chặn @everyone / @here trong ghi chú
+                }
+
+                sending = true
+                SendBtn.Text = "..."
+                task.spawn(function()
+                    local ok, res = pcall(function()
+                        return RequestFunc({
+                            Url = webhookUrl,
+                            Method = "POST",
+                            Headers = { ["Content-Type"] = "application/json" },
+                            Body = HttpService:JSONEncode(body),
+                        })
+                    end)
+                    sending = false
+                    SendBtn.Text = sendText
+                    local code = ok and type(res) == "table" and (res.StatusCode or res.Status) or nil
+                    if type(code) == "number" and code >= 200 and code < 300 then
+                        lastSend = tick()
+                        Window:Notify({ Title = "Thành Công", Text = "Đã gửi thông báo về Discord!", Type = "success" })
+                        InputBox.Text = ""
+                    else
+                        Window:Notify({ Title = "Lỗi", Text = "Gửi thất bại" .. (code and (" (mã " .. tostring(code) .. ")") or "") .. ".", Type = "error" })
+                    end
+                end)
+            end))
+
+            return OuterF
         end
 
         function W:CreateLabel(text, tooltip, fontSize)
@@ -1913,6 +2163,7 @@ function AlatferaLib.CreateWindow(config)
             return SF
         end
 
+        -- CreateButton(text, callback, tooltip, fontSize)
         function W:CreateButton(btnText, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -1945,6 +2196,7 @@ function AlatferaLib.CreateWindow(config)
             return B
         end
 
+        -- CreateToggle(text, flag, default, callback, tooltip, fontSize)
         function W:CreateToggle(toggleText, flagName, defaultState, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2013,6 +2265,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateSlider(text, flag, min, max, default, callback, showInput, tooltip, fontSize)
         function W:CreateSlider(sliderText, flagName, minVal, maxVal, defaultVal, callback, showInput, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2152,6 +2405,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateDropdown(text, options, default, callback, tooltip, fontSize)
         function W:CreateDropdown(dropText, options, defaultOption, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2239,6 +2493,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateMultiDropdown(text, options, defaultSelected, callback, tooltip, fontSize)
         function W:CreateMultiDropdown(dropText, options, defaultSelected, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2371,6 +2626,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateColorPicker(text, flag, defaultColor, callback, tooltip, fontSize)
         function W:CreateColorPicker(pickerText, flagName, defaultColor, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2547,6 +2803,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateTextbox(text, flag, maxChars, callback, tooltip, fontSize)
         function W:CreateTextbox(boxText, flagName, maxChars, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2609,6 +2866,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateKeybind(text, flag, defaultKey, callback, tooltip, fontSize)
         function W:CreateKeybind(labelText, flagName, defaultKey, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2684,6 +2942,7 @@ function AlatferaLib.CreateWindow(config)
             }
         end
 
+        -- CreateProgressBar(text, initialPercent, tooltip, fontSize)
         function W:CreateProgressBar(labelText, initialPercent, tooltip, fontSize)
             local fs = getFontSize(fontSize, 13)
             local pct = math.clamp(initialPercent or 0, 0, 100)
@@ -2736,6 +2995,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateImage(imageId, height)
         function W:CreateImage(imageId, height)
             if not imageId then return nil end
             local h = height or 100
@@ -2763,31 +3023,26 @@ function AlatferaLib.CreateWindow(config)
         return W
     end
 
-    -- ============ CREATE TAB (IMPROVED - NO VERTICAL LINE) ============
+    -- ============ CREATE TAB ============
     function Window:CreateTab(tabName, iconEmoji)
         local displayText = iconEmoji and (iconEmoji .. "  " .. tabName) or ("  " .. tabName)
         local TB = Instance.new("TextButton")
         TB.Size = UDim2.new(1, -6, 0, 36)
-        TB.BackgroundColor3 = FirstTab and Color3.fromRGB(32, 38, 52) or Color3.fromRGB(19, 21, 28)
+        TB.BackgroundColor3 = FirstTab and tabTint(themeColor) or Color3.fromRGB(19, 21, 28)
         TB.Text = displayText
         TB.TextColor3 = FirstTab and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(140, 145, 160)
         TB.TextXAlignment = Enum.TextXAlignment.Left
         TB.Font = Enum.Font.GothamBold; TB.TextSize = 13
         TB.AutoButtonColor = false
         TB.Parent = Sidebar
-        
         local TBPad = Instance.new("UIPadding"); TBPad.PaddingLeft = UDim.new(0, 12); TBPad.Parent = TB
         local TBC = Instance.new("UICorner"); TBC.CornerRadius = UDim.new(0, cornerRadius); TBC.Parent = TB
-        
-        local tabStroke = nil
+        local TBS = nil
         if enableStroke then
-            tabStroke = NewStroke()
-            tabStroke.Color = FirstTab and themeColor or strokeColor
-            tabStroke.Thickness = FirstTab and 1.5 or 1
-            tabStroke.Parent = TB
-            registerTheme(tabStroke, "Color")
+            TBS = NewStroke(); TBS.Color = FirstTab and themeColor or strokeColor; TBS.Thickness = 1; TBS.Parent = TB
+            tabStrokes[TB] = TBS
         end
-
+        if FirstTab then selectedTab.btn = TB; selectedTab.stroke = TBS end
         local TabC = Instance.new("ScrollingFrame")
         TabC.Size = UDim2.new(1, 0, 1, 0)
         TabC.BackgroundTransparency = 1
@@ -2796,54 +3051,42 @@ function AlatferaLib.CreateWindow(config)
         TabC.CanvasSize = UDim2.new(0, 0, 0, 0)
         TabC.Visible = FirstTab
         TabC.Parent = ContentArea
-        
         local CL = Instance.new("UIListLayout")
         CL.Padding = UDim.new(0, 10); CL.SortOrder = Enum.SortOrder.LayoutOrder
         CL.Parent = TabC
-        
         Track(CL:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             TabC.CanvasSize = UDim2.new(0, 0, 0, CL.AbsoluteContentSize.Y + 15)
         end))
-
         Track(TB.MouseEnter:Connect(function()
             if not TabC.Visible then
                 TweenService:Create(TB, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(24, 28, 40)}):Play()
             end
         end))
-        
         Track(TB.MouseLeave:Connect(function()
             if not TabC.Visible then
                 TweenService:Create(TB, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(19, 21, 28)}):Play()
             end
         end))
-
         Track(TB.MouseButton1Click:Connect(function()
             for _, child in pairs(ContentArea:GetChildren()) do
                 if child:IsA("ScrollingFrame") then child.Visible = false end
             end
             for _, btn in pairs(Sidebar:GetChildren()) do
                 if btn:IsA("TextButton") then
-                    TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(19, 21, 28)}):Play()
+                    btn.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
                     btn.TextColor3 = Color3.fromRGB(140, 145, 160)
-                    local st = btn:FindFirstChildOfClass("UIStroke")
-                    if st then st.Color = strokeColor; st.Thickness = 1 end
                 end
             end
-            
+            for _, st in pairs(tabStrokes) do st.Color = strokeColor end
             TabC.Visible = true
-            TweenService:Create(TB, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(32, 38, 52)}):Play()
+            TB.BackgroundColor3 = tabTint(Window.ThemeColor)
+            if TBS then TBS.Color = Window.ThemeColor end
+            selectedTab.btn = TB; selectedTab.stroke = TBS
             TB.TextColor3 = Color3.fromRGB(255, 255, 255)
-            if tabStroke then
-                tabStroke.Color = themeColor
-                tabStroke.Thickness = 1.5
-            end
-
             TabC.Position = UDim2.new(0.06, 0, 0, 0)
             TweenService:Create(TabC, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
         end))
-        
         FirstTab = false
-
         local Tab = buildWidgets(TabC)
         function Tab:CreateSubTab(subName)
             local SB = Instance.new("Frame")
