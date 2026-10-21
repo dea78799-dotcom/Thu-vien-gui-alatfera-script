@@ -33,12 +33,14 @@ local ColorPresets = {
     neon    = Color3.fromRGB(57, 255, 20),   dark    = Color3.fromRGB(15, 17, 23),
 }
 
+-- Viền luôn bo theo khung (mặc định của Roblox sẽ viền chữ nếu nằm trong nút/nhãn)
 local function NewStroke()
     local st = Instance.new("UIStroke")
     st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     return st
 end
 
+-- Đo chữ an toàn: nếu GetTextSize lỗi thì ước lượng
 local function SafeTextSize(text, size, font, bounds)
     local ok, res = pcall(function() return TextService:GetTextSize(text, size, font, bounds) end)
     if ok and res then return res end
@@ -76,6 +78,7 @@ local function GetFromClipboard()
 end
 
 -- ============ CONFIG CODE: mã hóa + chống sửa + hết hạn ============
+-- Code chỉ gồm chữ, số và 4 ký hiệu ( ) ! ?
 local CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!?"
 local CODE_DECODE = {}
 for i = 1, #CODE_ALPHABET do CODE_DECODE[CODE_ALPHABET:sub(i, i)] = i - 1 end
@@ -176,6 +179,7 @@ local function codeToBytes(code)
     return table.concat(out)
 end
 
+-- Chỉ nhận giá trị an toàn: boolean, number, string ngắn, bảng 3 số (màu)
 local function cleanSnapshot(src)
     local snap, count = {}, 0
     if type(src) ~= "table" then return snap, 0 end
@@ -199,6 +203,7 @@ local function cleanSnapshot(src)
     return snap, count
 end
 
+-- Chia code thành 2-9 dòng cho dễ nhìn
 local function formatCodeLines(code)
     local len = #code
     local width = math.max(64, math.ceil(len / 9))
@@ -219,6 +224,7 @@ local function EncodeConfigCode(secret, snapshot, days)
     return formatCodeLines("(" .. bytesToCode(raw) .. ")")
 end
 
+-- Trả về: true, bảng cài đặt  |  false, "invalid"  |  false, "expired"
 local function DecodeConfigCode(secret, text)
     local flat = tostring(text or ""):gsub("%s", "")
     if #flat < 20 or #flat > CODE_MAX_LEN then return false, "invalid" end
@@ -305,8 +311,8 @@ function AlatferaLib.CreateWindow(config)
     local useKeySystem = config.KeySystem or false
     local correctKey   = config.Key or "AlatferaKey123"
     local discordLink  = config.DiscordLink or "https://discord.gg/alatfera"
-    local rememberKey  = (config.RememberKey == nil) and true or config.RememberKey
-    local discordShow  = (config.DiscordLink ~= false)
+    local rememberKey  = (config.RememberKey == nil) and true or config.RememberKey   -- false = luôn hỏi key mỗi lần
+    local discordShow  = (config.DiscordLink ~= false)   -- DiscordLink = false: ẩn nút Discord
     local discordText  = tostring(config.DiscordText or "📋 Copy Discord")
     local keyLink      = (type(config.KeyLink) == "string" and config.KeyLink ~= "") and config.KeyLink or nil
     local keyLinkText  = tostring(config.KeyLinkText or "🔑 Copy Link Lấy Key")
@@ -344,7 +350,7 @@ function AlatferaLib.CreateWindow(config)
     local connections = {}
     local function Track(c) table.insert(connections, c); return c end
     local presetAppliers = {}
-    local modalCount = 0
+    local modalCount = 0   -- > 0 khi có hộp xác nhận đang mở
     local themeTargets = {}
 
     local function registerTheme(instance, property)
@@ -356,14 +362,13 @@ function AlatferaLib.CreateWindow(config)
             math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
     end
 
-    -- ============ KEY SYSTEM (ĐÃ FIX GIAO DIỆN XẤU) ============
+    -- ============ KEY SYSTEM ============
     if useKeySystem then
         local keyPassed = rememberKey and (savedData["_SavedKey"] == correctKey)
         if not keyPassed then
             local KeyFrame = Instance.new("Frame")
             local hasSecondary = discordShow or keyLink ~= nil
-            -- Tăng chiều cao khung hợp lý để các nút phụ (Discord, Link Lấy Key) hiển thị đẹp, đều màu
-            local keyH = hasSecondary and 245 or 190
+            local keyH = hasSecondary and 232 or 190
             KeyFrame.Size = UDim2.new(0, 360, 0, keyH)
             KeyFrame.Position = UDim2.new(0.5, -180, 0.5, -keyH / 2)
             KeyFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
@@ -398,9 +403,6 @@ function AlatferaLib.CreateWindow(config)
             KeyInput.Font = Enum.Font.Gotham; KeyInput.TextSize = 13
             KeyInput.Parent = KeyFrame
             local IC = Instance.new("UICorner"); IC.CornerRadius = UDim.new(0, cornerRadius - 2); IC.Parent = KeyInput
-            if enableStroke then
-                local KISt = NewStroke(); KISt.Color = strokeColor; KISt.Thickness = 1; KISt.Parent = KeyInput
-            end
 
             local StatusLabel = Instance.new("TextLabel")
             StatusLabel.Size = UDim2.new(1, -20, 0, 18); StatusLabel.Position = UDim2.new(0, 10, 0, 110)
@@ -409,7 +411,7 @@ function AlatferaLib.CreateWindow(config)
             StatusLabel.Parent = KeyFrame
 
             local SubmitBtn = Instance.new("TextButton")
-            SubmitBtn.Size = UDim2.new(1, -30, 0, 36); SubmitBtn.Position = UDim2.new(0, 15, 0, 134)
+            SubmitBtn.Size = UDim2.new(1, -30, 0, 36); SubmitBtn.Position = UDim2.new(0, 15, 0, 138)
             SubmitBtn.BackgroundColor3 = themeColor; SubmitBtn.Text = "Xác Nhận"
             SubmitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             SubmitBtn.Font = Enum.Font.GothamBold; SubmitBtn.TextSize = 13
@@ -419,67 +421,51 @@ function AlatferaLib.CreateWindow(config)
             registerTheme(SubmitBtn, "BackgroundColor3")
             AttachButtonEffects(SubmitBtn, Track)
 
-            -- Căn chỉnh nút phụ đồng bộ tông màu tối chuẩn GUI, không bị chói
+            -- Hàng nút phụ (Discord, Link lấy key): cùng bề rộng với ô nhập, cùng tông màu với GUI
             if hasSecondary then
-                local SecondaryContainer = Instance.new("Frame")
-                SecondaryContainer.Size = UDim2.new(1, -30, 0, 36)
-                SecondaryContainer.Position = UDim2.new(0, 15, 0, 178)
-                SecondaryContainer.BackgroundTransparency = 1
-                SecondaryContainer.Parent = KeyFrame
-
+                local Row = Instance.new("Frame")
+                Row.Size = UDim2.new(1, -30, 0, 34); Row.Position = UDim2.new(0, 15, 0, 182)
+                Row.BackgroundTransparency = 1
+                Row.Parent = KeyFrame
+                local RowL = Instance.new("UIListLayout")
+                RowL.FillDirection = Enum.FillDirection.Horizontal
+                RowL.Padding = UDim.new(0, 8)
+                RowL.SortOrder = Enum.SortOrder.LayoutOrder
+                RowL.Parent = Row
                 local count = (discordShow and 1 or 0) + (keyLink and 1 or 0)
-                local function makeSecondaryBtn(text, posX, widthPct, onClick)
+
+                local function makeSecondary(text, order, onClick)
                     local B = Instance.new("TextButton")
-                    B.Size = UDim2.new(widthPct, (count == 2 and -4 or 0), 1, 0)
-                    B.Position = UDim2.new(posX, 0, 0, 0)
-                    -- Đồng bộ màu nền với khối widget trong GUI (Color3.fromRGB(24, 28, 38))
-                    B.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+                    B.Size = (count == 2) and UDim2.new(0.5, -4, 1, 0) or UDim2.new(1, 0, 1, 0)
+                    B.BackgroundColor3 = Color3.fromRGB(30, 34, 46)
                     B.Text = text
                     B.TextColor3 = Color3.fromRGB(225, 228, 238)
                     B.Font = Enum.Font.GothamBold; B.TextSize = 12
                     B.AutoButtonColor = false
-                    B.Parent = SecondaryContainer
+                    B.LayoutOrder = order
+                    B.Parent = Row
                     local BCc = Instance.new("UICorner"); BCc.CornerRadius = UDim.new(0, cornerRadius - 2); BCc.Parent = B
                     if enableStroke then
                         local BSt = NewStroke(); BSt.Color = strokeColor; BSt.Thickness = 1; BSt.Parent = B
                     end
-                    AttachButtonEffects(B, Track, Color3.fromRGB(34, 40, 56))
+                    AttachButtonEffects(B, Track, Color3.fromRGB(40, 45, 60))
                     Track(B.MouseButton1Click:Connect(function() onClick(B) end))
                     return B
                 end
 
-                if count == 2 then
-                    if discordShow then
-                        makeSecondaryBtn(discordText, 0, 0.5, function(B)
-                            CopyToClipboard(discordLink)
-                            B.Text = "✓ Đã Copy!"
-                            task.wait(1.5)
-                            B.Text = discordText
-                        end)
-                    end
-                    if keyLink then
-                        makeSecondaryBtn(keyLinkText, 0.5, 0.5, function(B)
-                            CopyToClipboard(keyLink)
-                            if not (setclipboard or toclipboard) then
-                                StatusLabel.Text = keyLink
-                            end
-                            B.Text = "✓ Đã Copy!"
-                            task.wait(1.5)
-                            B.Text = keyLinkText
-                        end)
-                    end
-                elseif discordShow then
-                    makeSecondaryBtn(discordText, 0, 1, function(B)
+                if discordShow then
+                    makeSecondary(discordText, 1, function(B)
                         CopyToClipboard(discordLink)
                         B.Text = "✓ Đã Copy!"
                         task.wait(1.5)
                         B.Text = discordText
                     end)
-                elseif keyLink then
-                    makeSecondaryBtn(keyLinkText, 0, 1, function(B)
+                end
+                if keyLink then
+                    makeSecondary(keyLinkText, 2, function(B)
                         CopyToClipboard(keyLink)
                         if not (setclipboard or toclipboard) then
-                            StatusLabel.Text = keyLink
+                            StatusLabel.Text = keyLink   -- executor không có clipboard: hiện link ra để copy tay
                         end
                         B.Text = "✓ Đã Copy!"
                         task.wait(1.5)
@@ -586,6 +572,28 @@ function AlatferaLib.CreateWindow(config)
     local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(1, 0); FC.Parent = BarFill
 
     TweenService:Create(BarFill, TweenInfo.new(1.0, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)}):Play()
+
+    task.spawn(function()
+        while LoadingFrame.Parent do
+            local ring = Instance.new("Frame")
+            ring.Size = UDim2.new(0, 8, 0, 8)
+            ring.Position = UDim2.new(0.5, -4, 1, -22)
+            ring.BackgroundTransparency = 1
+            ring.Parent = LoadingFrame
+            local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(1, 0); rc.Parent = ring
+            local rs = NewStroke(); rs.Color = themeColor; rs.Thickness = 2; rs.Parent = ring
+            TweenService:Create(ring, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 50, 0, 50),
+                Position = UDim2.new(0.5, -25, 1, -43),
+            }):Play()
+            TweenService:Create(rs, TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Transparency = 1, Thickness = 0.5,
+            }):Play()
+            task.wait(1.2)
+            ring:Destroy()
+        end
+    end)
+
     task.wait(1.2)
     TweenService:Create(lScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
     task.wait(0.25)
@@ -621,7 +629,7 @@ function AlatferaLib.CreateWindow(config)
             ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 255, 0)),
             ColorSequenceKeypoint.new(0.66, Color3.fromRGB(0, 255, 255)),
             ColorSequenceKeypoint.new(0.83, Color3.fromRGB(0, 0, 255)),
-            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 0, 0)),   -- trùng màu đầu để vòng xoay liền mạch
         })
         rainbowGradient.Enabled = false
         rainbowGradient.Parent = mainStroke
@@ -629,10 +637,11 @@ function AlatferaLib.CreateWindow(config)
     local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
     TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
 
+    -- Bật/tắt viền cầu vồng chạy vòng quanh cửa sổ (cần Stroke = true)
     function Window:SetRainbowStroke(enabled)
         if not rainbowGradient then return false end
         if enabled then
-            mainStroke.Color = Color3.fromRGB(255, 255, 255)
+            mainStroke.Color = Color3.fromRGB(255, 255, 255)   -- gradient nhân với màu gốc nên màu gốc phải là trắng
             rainbowGradient.Enabled = true
             if not rainbowConn then
                 rainbowConn = RunService.RenderStepped:Connect(function()
@@ -784,6 +793,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
+    -- Layout từ phải sang trái: ✕ | 📜 | 🔍 | 🔒 | ⌨ | ? | 📋 | 📥
     local function makeTopBtn(text, xOffset, color, size)
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(0, 34, 0, 34); b.Position = UDim2.new(1, xOffset, 0, 6)
@@ -813,6 +823,7 @@ function AlatferaLib.CreateWindow(config)
     local PasteCfgBtn     = makeTopBtn("📥", -294)
     local isLocked = false
 
+    -- ============ SEARCH BOX ============
     local SearchBox = Instance.new("TextBox")
     SearchBox.Name = "SearchBox"
     SearchBox.AnchorPoint = Vector2.new(1, 0)
@@ -865,6 +876,7 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(SearchBox, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(20, 24, 34)}):Play()
     end))
 
+    -- Open button
     local OpenBtnFrame = Instance.new("TextButton")
     OpenBtnFrame.Size = UDim2.new(0, 120, 0, 32); OpenBtnFrame.Position = UDim2.new(0.5, -60, 0, 8)
     OpenBtnFrame.BackgroundColor3 = Color3.fromRGB(22, 25, 34); OpenBtnFrame.BackgroundTransparency = 0.35
@@ -949,6 +961,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
+    -- ============ DRAG LOGIC (kéo bằng Topbar) ============
     local dragging, dragStart, startPos
     Track(Topbar.InputBegan:Connect(function(input)
         if isLocked or modalCount > 0 then return end
@@ -1046,6 +1059,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
+-- ============ PROFILE CARD (avatar + tên) ============
     local function buildProfile(parent, cfg)
         cfg = cfg or {}
         local obj = {}
@@ -1135,6 +1149,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
+    -- Hiện (hoặc tạo lại) thẻ avatar ở cuối thanh bên
     function Window:ShowProfile(cfg)
         if profileCard then profileCard.Frame:Destroy(); profileCard = nil end
         profileCard = buildProfile(MainFrame, cfg)
@@ -1153,6 +1168,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
+    -- Đổi nội dung thẻ: Window:SetProfile({Name=..., SubText=..., Image=...})
     function Window:SetProfile(cfg)
         cfg = cfg or {}
         if not profileCard then return Window:ShowProfile(cfg) end
@@ -1164,6 +1180,7 @@ function AlatferaLib.CreateWindow(config)
 
     function Window:GetProfile() return profileCard end
 
+    -- Khung avatar nổi riêng (không nằm trong thanh bên)
     function Window:CreateProfileFrame(cfg)
         cfg = cfg or {}
         local card = buildProfile(ScreenGui, cfg)
@@ -1202,6 +1219,7 @@ function AlatferaLib.CreateWindow(config)
         })
     end
 
+    -- ============ HỘP XÁC NHẬN (CONFIRM) ============
     local confirmEnabled = (config.ConfirmEnabled == nil) and true or config.ConfirmEnabled
 
     function Window:SetConfirmEnabled(b) confirmEnabled = b and true or false end
@@ -1215,6 +1233,9 @@ function AlatferaLib.CreateWindow(config)
         end
     end
 
+    -- cfg: Title, Text, ConfirmText, CancelText, OnConfirm, OnCancel,
+    --      Buttons = { {Text=..., Callback=..., Close=true}, ... } (tối đa 8 nút thêm),
+    --      Danger (nút đồng ý màu đỏ), Color, CloseOnBackdrop
     function Window:Confirm(cfg)
         cfg = cfg or {}
         if not confirmEnabled then
@@ -1242,6 +1263,7 @@ function AlatferaLib.CreateWindow(config)
         local rowY = extraY + extraH + (#extra > 0 and 6 or 0)
         local dialogH = rowY + 36 + 16
 
+        -- Lớp nền chặn mọi thao tác phía sau
         local Backdrop = Instance.new("TextButton")
         Backdrop.Name = "ConfirmBackdrop"
         Backdrop.Size = UDim2.new(1, 0, 1, 0)
@@ -1320,6 +1342,7 @@ function AlatferaLib.CreateWindow(config)
             return B
         end
 
+        -- Các nút thêm (tùy người làm code)
         if #extra > 0 then
             local Ex = Instance.new("ScrollingFrame")
             Ex.Size = UDim2.new(1, -40, 0, extraH)
@@ -1343,6 +1366,7 @@ function AlatferaLib.CreateWindow(config)
             end
         end
 
+        -- Hai nút bắt buộc: Hủy và Đồng ý
         makeBtn(cancelText,
             UDim2.new(0, 20, 0, rowY), UDim2.new(0, 125, 0, 36),
             Color3.fromRGB(50, 56, 72),
@@ -1361,6 +1385,7 @@ function AlatferaLib.CreateWindow(config)
         return { Close = close }
     end
 
+    -- Dùng cho nút/công tắc: confirmCfg = true hoặc bảng cấu hình như Window:Confirm
     function Window:ConfirmAction(confirmCfg, fn)
         local cfg = {}
         if type(confirmCfg) == "table" then
@@ -1374,7 +1399,7 @@ function AlatferaLib.CreateWindow(config)
         return Window:Confirm(cfg)
     end
 
-    -- ============ NOTIFICATION SYSTEM ============
+        -- ============ NOTIFICATION SYSTEM (X + History) ============
     local notifHistory = {}
     local MAX_HISTORY = 50
 
@@ -1621,6 +1646,7 @@ function AlatferaLib.CreateWindow(config)
         if HistoryPanel.Visible then HistoryPanel.ZIndex = 100 end
     end))
 
+    -- ============ COPY/PASTE CONFIG ============
     local PastePanel = Instance.new("Frame")
     PastePanel.Size = UDim2.new(0, 400, 0, 240)
     PastePanel.Position = UDim2.new(0.5, -200, 0.5, -120)
@@ -1707,6 +1733,7 @@ function AlatferaLib.CreateWindow(config)
             PastePanel.Visible = false
             PPInput.Text = ""
         else
+            -- Code sai: xóa code đã dán và báo sai
             PPInput.Text = ""
             local msg = (res == "expired") and "Code đã hết hạn!" or "Code sai!"
             PPInput.PlaceholderText = "❌ " .. msg
@@ -1753,6 +1780,7 @@ function AlatferaLib.CreateWindow(config)
         end
     end))
 
+    -- ============ TOOLTIP ============
     local TooltipFrame = Instance.new("Frame")
     TooltipFrame.Size = UDim2.new(0, 200, 0, 28)
     TooltipFrame.BackgroundColor3 = Color3.fromRGB(30, 34, 46)
@@ -1788,6 +1816,7 @@ function AlatferaLib.CreateWindow(config)
         end))
     end
 
+    -- ============ PRESET METHODS ============
     function Window:SavePreset(name)
         if not name or name == "" then return false end
         if not savedData["_Presets"] then savedData["_Presets"] = {} end
@@ -1826,15 +1855,18 @@ function AlatferaLib.CreateWindow(config)
         return false
     end
 
+    -- ============ EXPORT / IMPORT CONFIG CODE ============
     function Window:SetConfigExpireDays(n)
         configExpireDays = math.clamp(math.floor(tonumber(n) or 7), 1, 30)
     end
 
+    -- Trả về: code, số ngày hết hạn  (code = nil nếu chưa có cài đặt để chia sẻ)
     function Window:ExportConfig(days)
         local d = math.clamp(math.floor(tonumber(days) or configExpireDays), 1, 30)
         return EncodeConfigCode(configSecret, savedData, d), d
     end
 
+    -- Trả về: true, số cài đặt đã áp dụng  |  false, "invalid"/"expired"
     function Window:ImportConfig(code)
         local ok, res = DecodeConfigCode(configSecret, code)
         if not ok then return false, res end
@@ -1848,6 +1880,7 @@ function AlatferaLib.CreateWindow(config)
         return true, applied
     end
 
+    -- ============ THEME SWITCHER ============
     function Window:SetTheme(newColor)
         local c = ParseColor(newColor, ColorPresets.blue)
         themeColor = c
@@ -1869,7 +1902,8 @@ function AlatferaLib.CreateWindow(config)
 
     function Window:GetTheme() return themeColor end
 
-    -- ============ WIDGET BUILDER (ĐÃ FIX LỖI MÀU NỀN XẤU Ở RESET & DISCORD) ============
+    -- ============ WIDGET BUILDER ============
+    -- Mọi widget nhận tham số fontSize cuối cùng (8-40)
     local function buildWidgets(container)
         local W = {}
 
@@ -1880,6 +1914,8 @@ function AlatferaLib.CreateWindow(config)
             return default
         end
 
+        -- Nút reset cấu hình: CreateResetConfigButton(tên, callbackThêm, confirm, chữNút)
+        -- confirm: mặc định hỏi lại trước khi xóa; truyền false để không hỏi
         function W:CreateResetConfigButton(customText, callback, confirmCfg, buttonText)
             customText = customText or "Reset cấu hình"
             buttonText = buttonText or "bấm"
@@ -1893,7 +1929,7 @@ function AlatferaLib.CreateWindow(config)
             end
 
             local function doReset()
-                local keepKey = savedData["_SavedKey"]
+                local keepKey = savedData["_SavedKey"]   -- giữ key đã nhập, chỉ xóa cài đặt
                 for k in pairs(savedData) do savedData[k] = nil end
                 savedData["_SavedKey"] = keepKey
                 SaveCurrentConfig()
@@ -1906,7 +1942,6 @@ function AlatferaLib.CreateWindow(config)
 
             local F = Instance.new("Frame")
             F.Size = UDim2.new(1, -10, 0, 48)
-            -- Đồng bộ màu nền chuẩn khối widget GUI thay vì màu sáng lệch tông
             F.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
             F.BorderSizePixel = 0
             F.Parent = container
@@ -1947,6 +1982,8 @@ function AlatferaLib.CreateWindow(config)
             return F
         end
 
+        -- Khung gửi ghi chú về Discord:
+        -- CreateDiscordWebhookWidget({ Title, WebhookUrl, Placeholder, ButtonText, Cooldown = 10, MaxLength = 900, IncludePlayerInfo = true })
         function W:CreateDiscordWebhookWidget(cfg)
             cfg = cfg or {}
             local widgetTitle = tostring(cfg.Title or "Thông báo về discord")
@@ -1970,8 +2007,7 @@ function AlatferaLib.CreateWindow(config)
 
             local HeaderF = Instance.new("Frame")
             HeaderF.Size = UDim2.new(1, 0, 0, 42)
-            -- Đồng bộ màu phần header của widget này ăn nhập với các widget thông thường
-            HeaderF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            HeaderF.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
             HeaderF.BorderSizePixel = 0
             HeaderF.Parent = OuterF
             local HFC = Instance.new("UICorner"); HFC.CornerRadius = UDim.new(0, cornerRadius); HFC.Parent = HeaderF
@@ -2044,7 +2080,7 @@ function AlatferaLib.CreateWindow(config)
                 local body = {
                     content = "",
                     embeds = {{ title = "🚀 " .. widgetTitle, color = 3447003, fields = fields }},
-                    allowed_mentions = { parse = {} },
+                    allowed_mentions = { parse = {} },   -- chặn @everyone / @here trong ghi chú
                 }
 
                 sending = true
@@ -2155,6 +2191,7 @@ function AlatferaLib.CreateWindow(config)
             return SF
         end
 
+        -- CreateButton(text, callback, tooltip, fontSize)
         function W:CreateButton(btnText, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2187,6 +2224,7 @@ function AlatferaLib.CreateWindow(config)
             return B
         end
 
+        -- CreateToggle(text, flag, default, callback, tooltip, fontSize)
         function W:CreateToggle(toggleText, flagName, defaultState, callback, tooltip, fontSize, confirmCfg)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2255,6 +2293,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateSlider(text, flag, min, max, default, callback, showInput, tooltip, fontSize)
         function W:CreateSlider(sliderText, flagName, minVal, maxVal, defaultVal, callback, showInput, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2394,6 +2433,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateDropdown(text, options, default, callback, tooltip, fontSize)
         function W:CreateDropdown(dropText, options, defaultOption, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2481,6 +2521,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateMultiDropdown(text, options, defaultSelected, callback, tooltip, fontSize)
         function W:CreateMultiDropdown(dropText, options, defaultSelected, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2613,6 +2654,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateColorPicker(text, flag, defaultColor, callback, tooltip, fontSize)
         function W:CreateColorPicker(pickerText, flagName, defaultColor, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2789,6 +2831,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateTextbox(text, flag, maxChars, callback, tooltip, fontSize)
         function W:CreateTextbox(boxText, flagName, maxChars, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2851,6 +2894,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateKeybind(text, flag, defaultKey, callback, tooltip, fontSize)
         function W:CreateKeybind(labelText, flagName, defaultKey, callback, tooltip, fontSize)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
@@ -2926,6 +2970,7 @@ function AlatferaLib.CreateWindow(config)
             }
         end
 
+        -- CreateProgressBar(text, initialPercent, tooltip, fontSize)
         function W:CreateProgressBar(labelText, initialPercent, tooltip, fontSize)
             local fs = getFontSize(fontSize, 13)
             local pct = math.clamp(initialPercent or 0, 0, 100)
@@ -2978,6 +3023,7 @@ function AlatferaLib.CreateWindow(config)
             return obj
         end
 
+        -- CreateImage(imageId, height)
         function W:CreateImage(imageId, height)
             if not imageId then return nil end
             local h = height or 100
@@ -3005,6 +3051,7 @@ function AlatferaLib.CreateWindow(config)
         return W
     end
 
+    -- ============ CREATE TAB ============
     function Window:CreateTab(tabName, iconEmoji)
         local displayText = iconEmoji and (iconEmoji .. "  " .. tabName) or ("  " .. tabName)
         local TB = Instance.new("TextButton")
@@ -3111,14 +3158,14 @@ function AlatferaLib.CreateWindow(config)
         return Tab
     end
 
-    -- ============ MINI WINDOW (ĐÃ XÓA NÚT KÉO & NÚT ĐỔI KÍCH THƯỚC) ============
+    -- ============ MINI WINDOW ============
     function Window:CreateMiniWindow(mwConfig)
         mwConfig = mwConfig or {}
         local mwX = mwConfig.X or 20
         local mwY = mwConfig.Y or 100
         local mwWidth = mwConfig.Width or 150
         local mwHeight = mwConfig.Height or 220
-        local mwDraggable = (mwConfig.Draggable == true)
+        local mwDraggable = (mwConfig.Draggable == true)   -- true = kéo bằng cách giữ vào nền cửa sổ (không có nút kéo)
         local mwMinW = mwConfig.MinWidth or 120
         local mwMaxW = mwConfig.MaxWidth or 400
         local mwMinH = mwConfig.MinHeight or 80
@@ -3151,6 +3198,9 @@ function AlatferaLib.CreateWindow(config)
             Container.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 10)
         end))
 
+        -- Không có nút kéo và không có nút đổi kích thước.
+        -- Kích thước và vị trí chỉ đổi bằng code (MW:SetSize, MW:SetPosition).
+        -- Nếu bật Draggable thì kéo được bằng cách giữ vào nền hoặc chữ của cửa sổ.
         local dg, ds, sp
         Track(MiniFrame.InputBegan:Connect(function(input)
             if not mwDraggable or modalCount > 0 then return end
@@ -3357,6 +3407,7 @@ function AlatferaLib.CreateWindow(config)
         end
         function MW:GetSize() return MiniFrame.AbsoluteSize end
         function MW:SetDraggable(bool) mwDraggable = bool and true or false end
+        -- Giữ lại để script cũ không lỗi, nhưng không còn tác dụng (không còn nút kéo / đổi kích thước)
         function MW:SetResizable() end
         function MW:SetDragBarVisible() end
         function MW:Show() MiniFrame.Visible = true end
@@ -3369,6 +3420,7 @@ function AlatferaLib.CreateWindow(config)
         return MW
     end
 
+    -- ============ VISUAL EFFECTS METHODS ============
     function Window:SetBlur(enabled)
         if enabled then
             if not blurEffect or not blurEffect.Parent then
@@ -3405,6 +3457,7 @@ function AlatferaLib.CreateWindow(config)
         return particleContainer ~= nil and particleContainer.Parent ~= nil
     end
 
+    -- ============ DESTROY ============
     function Window:Destroy()
         TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
         task.wait(0.3)
