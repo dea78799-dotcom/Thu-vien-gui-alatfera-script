@@ -1,3 +1,9 @@
+--[[
+    ============================================
+    ALATFERA LIB V14 - PRO EDITION (FIXED + Rainbow Stroke, Reset Config, Discord Webhook)
+    Notify X, History, Mini Search, Copy/Paste Config
+    ============================================
+]]
 
 local AlatferaLib = {}
 AlatferaLib.__index = AlatferaLib
@@ -330,6 +336,31 @@ function AlatferaLib.CreateWindow(config)
         if writefile then pcall(function() writefile(configFile, HttpService:JSONEncode(savedData)) end) end
     end
 
+    -- ============ THIẾT BỊ: điện thoại / máy tính ============
+    local deviceCfg = tostring(config.Device or "auto"):lower()
+    local isMobile
+    if deviceCfg == "mobile" then isMobile = true
+    elseif deviceCfg == "pc" then isMobile = false
+    else isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled end
+    local deviceName = isMobile and "Điện thoại" or "Máy tính"
+    local deviceEmoji = isMobile and "📱" or "🖥️"
+    local deviceImage = isMobile and config.DeviceIconMobile or config.DeviceIconPC   -- ảnh riêng, không bắt buộc
+
+    local fontBoost = isMobile and 2 or 0              -- chữ lớn hơn trên điện thoại
+    local rowMin = isMobile and 46 or 38               -- chiều cao tối thiểu của mỗi hàng (dễ chạm hơn)
+    local rowPad = isMobile and 26 or 22
+    local tbSize = isMobile and 40 or 34               -- cỡ nút trên thanh trên cùng
+    local tabH = isMobile and 42 or 36                 -- chiều cao nút tab
+    local winFracW = isMobile and 0.84 or 0.70         -- cửa sổ chiếm bao nhiêu màn hình (giữ lề tránh tai thỏ, góc bo)
+    local winFracH = isMobile and 0.88 or 0.78
+    local winMax = isMobile and Vector2.new(900, 520) or Vector2.new(760, 420)
+    local maxGuiScale = math.min(0.96 / winFracW, 0.96 / winFracH)
+    local guiScale = math.clamp(tonumber(config.GuiScale) or tonumber(savedData["_GuiScale"]) or 1, 0.7, maxGuiScale)
+    local showFloat = config.FloatButton
+    if showFloat == nil or showFloat == "auto" then showFloat = isMobile end
+    local tbTotal = 8 + 8 * (tbSize + 2)
+    local function tbx(i) return -(8 + tbSize + i * (tbSize + 2)) end
+
     local oldGui = ParentContainer:FindFirstChild("AlatferaGui")
     if oldGui then oldGui:Destroy() end
 
@@ -363,8 +394,11 @@ function AlatferaLib.CreateWindow(config)
             local KeyFrame = Instance.new("Frame")
             local hasSecondary = discordShow or keyLink ~= nil
             local keyH = hasSecondary and 232 or 190
-            KeyFrame.Size = UDim2.new(0, 360, 0, keyH)
-            KeyFrame.Position = UDim2.new(0.5, -180, 0.5, -keyH / 2)
+            KeyFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+            KeyFrame.Size = UDim2.new(0.92, 0, 0, keyH)
+            KeyFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+            local KSize = Instance.new("UISizeConstraint")
+            KSize.MinSize = Vector2.new(260, 0); KSize.MaxSize = Vector2.new(360, 2000); KSize.Parent = KeyFrame
             KeyFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
             KeyFrame.BorderSizePixel = 0
             KeyFrame.Parent = ScreenGui
@@ -599,7 +633,7 @@ function AlatferaLib.CreateWindow(config)
 
     local MainFrame = Instance.new("Frame")
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    MainFrame.Size = UDim2.new(0.70, 0, 0.78, 0)
+    MainFrame.Size = UDim2.new(winFracW, 0, winFracH, 0)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     MainFrame.BorderSizePixel = 0
@@ -608,7 +642,7 @@ function AlatferaLib.CreateWindow(config)
     local MC = Instance.new("UICorner"); MC.CornerRadius = UDim.new(0, cornerRadius); MC.Parent = MainFrame
     local MSize = Instance.new("UISizeConstraint")
     MSize.MinSize = Vector2.new(380, 240)
-    MSize.MaxSize = Vector2.new(760, 420)
+    MSize.MaxSize = winMax
     MSize.Parent = MainFrame
     local mainStroke = nil
     local rainbowGradient = nil
@@ -628,8 +662,8 @@ function AlatferaLib.CreateWindow(config)
         rainbowGradient.Enabled = false
         rainbowGradient.Parent = mainStroke
     end
-    local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85; mainScale.Parent = MainFrame
-    TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+    local mainScale = Instance.new("UIScale"); mainScale.Scale = 0.85 * guiScale; mainScale.Parent = MainFrame
+    TweenService:Create(mainScale, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = guiScale}):Play()
 
     -- Bật/tắt viền cầu vồng chạy vòng quanh cửa sổ (cần Stroke = true)
     function Window:SetRainbowStroke(enabled)
@@ -753,24 +787,52 @@ function AlatferaLib.CreateWindow(config)
     end))
 
     local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(0.28, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 18, 0, 0)
+    TitleLabel.Size = UDim2.new(0.24, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 18, 0, 0)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.RichText = true
     TitleLabel.Text = hubTitle .. (hubVersion ~= "" and ("  <font color=\"" .. hexStringOf(themeColor) .. "\">" .. hubVersion .. "</font>") or "")
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 15
+    TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = isMobile and 16 or 15
+    TitleLabel.TextTruncate = Enum.TextTruncate.AtEnd
     TitleLabel.Parent = Topbar
 
     local StatsLabel = Instance.new("TextLabel")
-    StatsLabel.Size = UDim2.new(0.20, 0, 1, 0); StatsLabel.Position = UDim2.new(0.28, 10, 0, 0)
+    StatsLabel.Size = UDim2.new(0.22, 0, 0, 20); StatsLabel.Position = UDim2.new(0.24, 12, 0, 5)
     StatsLabel.BackgroundTransparency = 1; StatsLabel.Text = "⚡ 60 FPS | 0 ms"
     StatsLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
     StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
     StatsLabel.Font = Enum.Font.Gotham; StatsLabel.TextSize = 12
+    StatsLabel.TextTruncate = Enum.TextTruncate.AtEnd
     StatsLabel.Parent = Topbar
+
+    -- Dòng chữ nhỏ dưới FPS/ping: cho biết đang dùng máy tính hay điện thoại
+    local DeviceLabel = Instance.new("TextLabel")
+    DeviceLabel.Size = UDim2.new(0.22, 0, 0, 15); DeviceLabel.Position = UDim2.new(0.24, 12, 0, 25)
+    DeviceLabel.BackgroundTransparency = 1
+    DeviceLabel.TextColor3 = Color3.fromRGB(120, 125, 140)
+    DeviceLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DeviceLabel.Font = Enum.Font.Gotham; DeviceLabel.TextSize = 10
+    DeviceLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    DeviceLabel.Parent = Topbar
+    local DeviceIcon = nil
+    if deviceImage ~= nil then
+        -- Có ảnh riêng (DeviceIconPC / DeviceIconMobile): hiện ảnh nhỏ kế bên chữ
+        DeviceIcon = Instance.new("ImageLabel")
+        DeviceIcon.Size = UDim2.new(0, 13, 0, 13); DeviceIcon.Position = UDim2.new(0.24, 12, 0, 26)
+        DeviceIcon.BackgroundTransparency = 1; DeviceIcon.ScaleType = Enum.ScaleType.Fit
+        DeviceIcon.Image = (type(deviceImage) == "number") and ("rbxassetid://" .. deviceImage) or tostring(deviceImage)
+        DeviceIcon.Parent = Topbar
+        DeviceLabel.Position = UDim2.new(0.24, 28, 0, 25)
+        DeviceLabel.Text = deviceName
+    else
+        DeviceLabel.Text = deviceEmoji .. " " .. deviceName
+    end
     local function updateStatsVisibility()
-        StatsLabel.Visible = MainFrame.AbsoluteSize.X >= 640
+        local show = MainFrame.AbsoluteSize.X >= 620
+        StatsLabel.Visible = show
+        DeviceLabel.Visible = show
+        if DeviceIcon then DeviceIcon.Visible = show end
     end
     updateStatsVisibility()
     Track(MainFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateStatsVisibility))
@@ -790,10 +852,10 @@ function AlatferaLib.CreateWindow(config)
     -- Layout từ phải sang trái: ✕ | 📜 | 🔍 | 🔒 | ⌨ | ? | 📋 | 📥
     local function makeTopBtn(text, xOffset, color, size)
         local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0, 34, 0, 34); b.Position = UDim2.new(1, xOffset, 0, 6)
+        b.Size = UDim2.new(0, tbSize, 0, tbSize); b.Position = UDim2.new(1, xOffset, 0.5, -tbSize / 2)
         b.BackgroundTransparency = 1; b.Text = text
         b.TextColor3 = color or Color3.fromRGB(180, 185, 200)
-        b.TextSize = size or 16
+        b.TextSize = size or (isMobile and 18 or 16)
         b.Font = Enum.Font.GothamBold; b.Parent = Topbar
         b.AutoButtonColor = false
         b.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -807,14 +869,14 @@ function AlatferaLib.CreateWindow(config)
         return b
     end
 
-    local CloseBtn        = makeTopBtn("✕", -42,  Color3.fromRGB(245, 70, 90), 17)
-    local HistoryBtn      = makeTopBtn("📜", -78)
-    local SearchToggleBtn = makeTopBtn("🔍", -114)
-    local LockBtn         = makeTopBtn("🔓", -150)
-    local KeybindBtn      = makeTopBtn("⌨", -186)
-    local HelpBtn         = makeTopBtn("?", -222)
-    local CopyCfgBtn      = makeTopBtn("📋", -258)
-    local PasteCfgBtn     = makeTopBtn("📥", -294)
+    local CloseBtn        = makeTopBtn("×", tbx(0), Color3.fromRGB(245, 70, 90), isMobile and 28 or 24)
+    local HistoryBtn      = makeTopBtn("📜", tbx(1))
+    local SearchToggleBtn = makeTopBtn("🔍", tbx(2))
+    local LockBtn         = makeTopBtn("🔓", tbx(3))
+    local KeybindBtn      = makeTopBtn("⌨", tbx(4))
+    local HelpBtn         = makeTopBtn("?", tbx(5))
+    local CopyCfgBtn      = makeTopBtn("📋", tbx(6))
+    local PasteCfgBtn     = makeTopBtn("📥", tbx(7))
     local isLocked = false
 
     -- ============ SEARCH BOX ============
@@ -822,7 +884,7 @@ function AlatferaLib.CreateWindow(config)
     SearchBox.Name = "SearchBox"
     SearchBox.AnchorPoint = Vector2.new(1, 0)
     SearchBox.Size = UDim2.new(0, 0, 0, 28)
-    SearchBox.Position = UDim2.new(1, -298, 0, 9)
+    SearchBox.Position = UDim2.new(1, -(tbTotal + 2), 0, 9)
     SearchBox.BackgroundColor3 = Color3.fromRGB(12, 14, 19)
     SearchBox.Text = ""
     SearchBox.PlaceholderText = "🔍 Tìm kiếm..."
@@ -893,7 +955,59 @@ function AlatferaLib.CreateWindow(config)
         end
     end)
 
-    Track(CloseBtn.MouseButton1Click:Connect(function()
+    -- Nút tròn nổi (kéo được bằng ngón tay, bấm nhẹ để làm việc). Dùng cho nút ẩn/hiện GUI và nút ảo của Keybind
+    local function makeFloatButton(text, size, startPos, onClick)
+        local B = Instance.new("TextButton")
+        B.Size = UDim2.new(0, size, 0, size)
+        B.Position = UDim2.new(0, startPos.X, 0, startPos.Y)
+        B.BackgroundColor3 = Color3.fromRGB(22, 25, 34)
+        B.BackgroundTransparency = 0.1
+        B.Text = text
+        B.TextColor3 = Color3.fromRGB(255, 255, 255)
+        B.Font = Enum.Font.GothamBold; B.TextSize = 14
+        B.TextWrapped = true
+        B.AutoButtonColor = false
+        B.ZIndex = 150
+        B.Parent = ScreenGui
+        local BCr = Instance.new("UICorner"); BCr.CornerRadius = UDim.new(1, 0); BCr.Parent = B
+        local BSt = NewStroke(); BSt.Color = themeColor; BSt.Thickness = 2; BSt.Parent = B
+        registerTheme(BSt, "Color")
+
+        local down, moved, startInput, startOffX, startOffY = false, false, nil, 0, 0
+        Track(B.InputBegan:Connect(function(input)
+            if modalCount > 0 then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                down = true; moved = false
+                startInput = input.Position
+                startOffX = B.Position.X.Offset; startOffY = B.Position.Y.Offset
+            end
+        end))
+        Track(UserInputService.InputChanged:Connect(function(input)
+            if down and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local dx = input.Position.X - startInput.X
+                local dy = input.Position.Y - startInput.Y
+                if not moved and math.sqrt(dx * dx + dy * dy) > 8 then moved = true end
+                if moved then
+                    local vs = ScreenGui.AbsoluteSize
+                    local nx = math.clamp(startOffX + dx, 0, math.max(0, vs.X - size))
+                    local ny = math.clamp(startOffY + dy, 0, math.max(0, vs.Y - size))
+                    B.Position = UDim2.new(0, nx, 0, ny)
+                end
+            end
+        end))
+        Track(UserInputService.InputEnded:Connect(function(input)
+            if down and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                down = false
+                if not moved and modalCount == 0 then onClick() end
+            end
+        end))
+        return B
+    end
+
+    local guiBusy = false
+    local function hideGui()
+        if guiBusy or not MainFrame.Visible then return end
+        guiBusy = true
         savedBlurState = Window:IsBlurEnabled()
         savedParticleState = Window:IsParticlesEnabled()
         Window:SetBlur(false)
@@ -901,29 +1015,52 @@ function AlatferaLib.CreateWindow(config)
         TweenService:Create(mainScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0}):Play()
         task.wait(0.25)
         MainFrame.Visible = false
-        mainScale.Scale = 1
-        OpenBtnFrame.Visible = true
-    end))
-
-    Track(OpenBtnFrame.MouseButton1Click:Connect(function()
+        mainScale.Scale = guiScale
+        OpenBtnFrame.Visible = not showFloat
+        guiBusy = false
+    end
+    local function showGui()
+        if guiBusy or MainFrame.Visible then return end
         MainFrame.Visible = true
         OpenBtnFrame.Visible = false
-        mainScale.Scale = 0.85
-        TweenService:Create(mainScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        mainScale.Scale = 0.85 * guiScale
+        TweenService:Create(mainScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = guiScale}):Play()
         if savedBlurState then Window:SetBlur(true) end
         if savedParticleState then Window:SetParticles(true) end
-    end))
+    end
+    local function toggleGui()
+        if MainFrame.Visible then hideGui() else showGui() end
+    end
+    Track(CloseBtn.MouseButton1Click:Connect(hideGui))
+    Track(OpenBtnFrame.MouseButton1Click:Connect(showGui))
+
+    -- Nút tròn ẩn/hiện GUI (mặc định bật trên điện thoại, tắt trên máy tính)
+    local FloatBtn = nil
+    local function setFloat(b)
+        showFloat = b and true or false
+        if showFloat and not FloatBtn then
+            local vs = ScreenGui.AbsoluteSize
+            FloatBtn = makeFloatButton(tostring(config.FloatButtonText or "A"), isMobile and 46 or 40,
+                Vector2.new(12, math.max(60, vs.Y * 0.35)), toggleGui)
+            FloatBtn.TextSize = 18
+            FloatBtn.TextColor3 = themeColor
+            registerTheme(FloatBtn, "TextColor3")
+        end
+        if FloatBtn then FloatBtn.Visible = showFloat end
+        if not MainFrame.Visible then OpenBtnFrame.Visible = not showFloat end
+    end
+    setFloat(showFloat)
 
     local currentToggleKey = config.ToggleKey or Enum.KeyCode.RightControl
     Track(HelpBtn.MouseButton1Click:Connect(function()
         Window:Notify({
             Title = "Hướng Dẫn",
-            Text = "• Kéo GUI bằng thanh trên cùng.\n• 🔒 Khóa GUI.\n• 🔍 Mở khung tìm kiếm.\n• 📜 Xem lịch sử thông báo.\n• RightControl ẩn/hiện.",
+            Text = "• Kéo GUI bằng thanh trên cùng.\n• 🔒 Khóa GUI.\n• 🔍 Mở khung tìm kiếm.\n• 📜 Xem lịch sử thông báo.\n" .. (isMobile and "• Bấm nút tròn để ẩn/hiện GUI." or ("• " .. currentToggleKey.Name .. " ẩn/hiện GUI.")),
             Duration = 5,
         })
     end))
     Track(KeybindBtn.MouseButton1Click:Connect(function()
-        Window:Notify({ Title = "Phím Tắt", Text = "Ẩn/hiện GUI: " .. tostring(currentToggleKey.Name), Duration = 4 })
+        Window:Notify({ Title = "Phím Tắt", Text = isMobile and "Bấm nút tròn trên màn hình để ẩn/hiện GUI." or ("Ẩn/hiện GUI: " .. tostring(currentToggleKey.Name)), Duration = 4 })
     end))
     Track(LockBtn.MouseButton1Click:Connect(function()
         isLocked = not isLocked
@@ -939,19 +1076,7 @@ function AlatferaLib.CreateWindow(config)
 
     Track(UserInputService.InputBegan:Connect(function(input, gpe)
         if not gpe and modalCount == 0 and input.KeyCode == currentToggleKey then
-            if MainFrame.Visible then
-                savedBlurState = Window:IsBlurEnabled()
-                savedParticleState = Window:IsParticlesEnabled()
-                Window:SetBlur(false)
-                Window:SetParticles(false)
-                MainFrame.Visible = false
-                OpenBtnFrame.Visible = true
-            else
-                MainFrame.Visible = true
-                OpenBtnFrame.Visible = false
-                if savedBlurState then Window:SetBlur(true) end
-                if savedParticleState then Window:SetParticles(true) end
-            end
+            toggleGui()
         end
     end))
 
@@ -999,11 +1124,13 @@ function AlatferaLib.CreateWindow(config)
         Sidebar.CanvasSize = UDim2.new(0, 0, 0, TabListLayout.AbsoluteContentSize.Y + 12)
     end))
 
+    local PlaytimeFrameRef = nil
     if showPlaytime then
         local PlaytimeFrame = Instance.new("Frame")
         PlaytimeFrame.Size = UDim2.new(0, 160, 0, 24); PlaytimeFrame.Position = UDim2.new(0, 10, 1, -28)
         PlaytimeFrame.BackgroundColor3 = Color3.fromRGB(19, 21, 28); PlaytimeFrame.BorderSizePixel = 0
         PlaytimeFrame.Parent = MainFrame
+        PlaytimeFrameRef = PlaytimeFrame
         local PTC = Instance.new("UICorner"); PTC.CornerRadius = UDim.new(0, cornerRadius); PTC.Parent = PlaytimeFrame
         if enableStroke then
             local PTS = NewStroke(); PTS.Color = strokeColor; PTS.Thickness = 1; PTS.Parent = PlaytimeFrame
@@ -1060,6 +1187,7 @@ function AlatferaLib.CreateWindow(config)
         local F = Instance.new("Frame")
         F.BackgroundColor3 = Color3.fromRGB(19, 21, 28)
         F.BorderSizePixel = 0
+        F.ClipsDescendants = true
         F.Parent = parent
         local FC = Instance.new("UICorner"); FC.CornerRadius = UDim.new(0, cornerRadius); FC.Parent = F
         if enableStroke then
@@ -1135,13 +1263,22 @@ function AlatferaLib.CreateWindow(config)
     end
 
     local profileCard = nil
+    local sbW = 160
     local function updateSidebarLayout()
+        -- Cửa sổ hẹp (màn hình dọc, điện thoại nhỏ): thanh tab hẹp lại, nhường chỗ cho nội dung
+        sbW = (MainFrame.AbsoluteSize.X < 520) and 126 or 160
         local base = showPlaytime and -86 or -58
-        Sidebar.Size = UDim2.new(0, 160, 1, profileCard and (base - 54) or base)
+        Sidebar.Size = UDim2.new(0, sbW, 1, profileCard and (base - 54) or base)
+        ContentArea.Position = UDim2.new(0, sbW + 18, 0, 54)
+        ContentArea.Size = UDim2.new(1, -(sbW + 28), 1, -62)
+        if PlaytimeFrameRef then PlaytimeFrameRef.Size = UDim2.new(0, sbW, 0, 24) end
         if profileCard then
+            profileCard.Frame.Size = UDim2.new(0, sbW, 0, 48)
             profileCard.Frame.Position = UDim2.new(0, 10, 1, showPlaytime and -82 or -54)
         end
     end
+    updateSidebarLayout()
+    Track(MainFrame:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateSidebarLayout))
 
     -- Hiện (hoặc tạo lại) thẻ avatar ở cuối thanh bên
     function Window:ShowProfile(cfg)
@@ -1412,8 +1549,10 @@ function AlatferaLib.CreateWindow(config)
 
     local HistoryPanel = Instance.new("Frame")
     HistoryPanel.Name = "HistoryPanel"
-    HistoryPanel.Size = UDim2.new(0, 320, 0, 420)
-    HistoryPanel.Position = UDim2.new(0.5, -160, 0.5, -210)
+    HistoryPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+    HistoryPanel.Size = UDim2.new(0.9, 0, 0.85, 0)
+    HistoryPanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+    local HPSize = Instance.new("UISizeConstraint"); HPSize.MaxSize = Vector2.new(320, 420); HPSize.Parent = HistoryPanel
     HistoryPanel.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     HistoryPanel.BorderSizePixel = 0
     HistoryPanel.Visible = false
@@ -1440,9 +1579,9 @@ function AlatferaLib.CreateWindow(config)
     HPClose.Size = UDim2.new(0, 30, 0, 30)
     HPClose.Position = UDim2.new(1, -38, 0, 9)
     HPClose.BackgroundTransparency = 1
-    HPClose.Text = "✕"
+    HPClose.Text = "×"
     HPClose.TextColor3 = Color3.fromRGB(245, 70, 90)
-    HPClose.TextSize = 16
+    HPClose.TextSize = 24
     HPClose.Font = Enum.Font.GothamBold
     HPClose.Parent = HistoryPanel
 
@@ -1598,9 +1737,9 @@ function AlatferaLib.CreateWindow(config)
         CloseNotif.Size = UDim2.new(0, 24, 0, 24)
         CloseNotif.Position = UDim2.new(1, -30, 0, 4)
         CloseNotif.BackgroundTransparency = 1
-        CloseNotif.Text = "✕"
+        CloseNotif.Text = "×"
         CloseNotif.TextColor3 = Color3.fromRGB(180, 185, 200)
-        CloseNotif.TextSize = 13
+        CloseNotif.TextSize = 20
         CloseNotif.Font = Enum.Font.GothamBold
         CloseNotif.Parent = Item
 
@@ -1642,8 +1781,10 @@ function AlatferaLib.CreateWindow(config)
 
     -- ============ COPY/PASTE CONFIG ============
     local PastePanel = Instance.new("Frame")
-    PastePanel.Size = UDim2.new(0, 400, 0, 240)
-    PastePanel.Position = UDim2.new(0.5, -200, 0.5, -120)
+    PastePanel.AnchorPoint = Vector2.new(0.5, 0.5)
+    PastePanel.Size = UDim2.new(0.92, 0, 0, 240)
+    PastePanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+    local PPSize = Instance.new("UISizeConstraint"); PPSize.MaxSize = Vector2.new(400, 240); PPSize.Parent = PastePanel
     PastePanel.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
     PastePanel.BorderSizePixel = 0
     PastePanel.Visible = false
@@ -1670,9 +1811,9 @@ function AlatferaLib.CreateWindow(config)
     PPClose.Size = UDim2.new(0, 30, 0, 30)
     PPClose.Position = UDim2.new(1, -38, 0, 8)
     PPClose.BackgroundTransparency = 1
-    PPClose.Text = "✕"
+    PPClose.Text = "×"
     PPClose.TextColor3 = Color3.fromRGB(245, 70, 90)
-    PPClose.TextSize = 16
+    PPClose.TextSize = 24
     PPClose.Font = Enum.Font.GothamBold
     PPClose.Parent = PastePanel
 
@@ -1796,18 +1937,61 @@ function AlatferaLib.CreateWindow(config)
     TooltipLabel.ZIndex = 101
     TooltipLabel.Parent = TooltipFrame
 
+    local tipSeq = 0
+    local suppressClick = false   -- sau khi nhấn giữ hiện gợi ý, bỏ qua cú bấm khi nhả tay
+    Track(UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then suppressClick = false end
+    end))
+
+    local function showTip(widget, text)
+        tipSeq = tipSeq + 1
+        TooltipLabel.Text = text
+        local w = math.clamp(#text * 7 + 20, 100, 260)
+        TooltipFrame.Size = UDim2.new(0, w, 0, 28)
+        local vs = ScreenGui.AbsoluteSize
+        local x = widget.AbsolutePosition.X + widget.AbsoluteSize.X + 10
+        local y = widget.AbsolutePosition.Y + widget.AbsoluteSize.Y / 2 - 14
+        if isMobile or (vs.X > 0 and x + w > vs.X) then
+            -- Điện thoại (hoặc hết chỗ bên phải): hiện phía trên widget
+            x = math.clamp(widget.AbsolutePosition.X, 6, math.max(6, vs.X - w - 6))
+            y = math.max(6, widget.AbsolutePosition.Y - 34)
+        end
+        TooltipFrame.Position = UDim2.new(0, x, 0, y)
+        TooltipFrame.Visible = true
+    end
+    local function hideTipAfter(delay)
+        local seq = tipSeq
+        task.delay(delay, function()
+            if seq == tipSeq then TooltipFrame.Visible = false end
+        end)
+    end
+
     local function AddTooltip(widget, text)
         if not text or text == "" then return end
-        Track(widget.MouseEnter:Connect(function()
-            TooltipLabel.Text = text
-            local w = math.clamp(#text * 7 + 20, 100, 260)
-            TooltipFrame.Size = UDim2.new(0, w, 0, 28)
-            TooltipFrame.Position = UDim2.new(0, widget.AbsolutePosition.X + widget.AbsoluteSize.X + 10, 0, widget.AbsolutePosition.Y + widget.AbsoluteSize.Y/2 - 14)
-            TooltipFrame.Visible = true
-        end))
-        Track(widget.MouseLeave:Connect(function()
-            TooltipFrame.Visible = false
-        end))
+        if isMobile then
+            -- Điện thoại: nhấn giữ khoảng nửa giây để hiện gợi ý
+            local press = 0
+            Track(widget.InputBegan:Connect(function(input)
+                if input.UserInputType ~= Enum.UserInputType.Touch then return end
+                press = press + 1
+                local my = press
+                task.delay(0.5, function()
+                    if press == my and modalCount == 0 then
+                        suppressClick = true
+                        showTip(widget, text)
+                    end
+                end)
+            end))
+            Track(widget.InputEnded:Connect(function(input)
+                if input.UserInputType ~= Enum.UserInputType.Touch then return end
+                press = press + 1
+                hideTipAfter(1.8)
+            end))
+        else
+            -- Máy tính: rê chuột vào để hiện gợi ý
+            Track(widget.MouseEnter:Connect(function() showTip(widget, text) end))
+            Track(widget.MouseLeave:Connect(function() TooltipFrame.Visible = false end))
+        end
     end
 
     -- ============ PRESET METHODS ============
@@ -1847,6 +2031,30 @@ function AlatferaLib.CreateWindow(config)
             return true
         end
         return false
+    end
+
+    -- ============ THIẾT BỊ + CỠ GIAO DIỆN + NÚT TRÒN ============
+    function Window:GetDevice() return isMobile and "mobile" or "pc" end
+    function Window:IsMobile() return isMobile end
+    function Window:SetFloatButton(b) setFloat(b) end
+    function Window:IsFloatButton() return showFloat end
+
+    -- Đổi cỡ toàn bộ GUI (0.7 đến mức tối đa còn vừa màn hình). Được lưu lại cho lần sau.
+    function Window:SetGuiScale(f)
+        f = math.clamp(tonumber(f) or 1, 0.7, maxGuiScale)
+        guiScale = f
+        savedData["_GuiScale"] = f
+        SaveCurrentConfig()
+        if MainFrame.Visible then
+            TweenService:Create(mainScale, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Scale = f}):Play()
+        end
+        return f
+    end
+    function Window:GetGuiScale() return guiScale end
+    -- Window:SetGuiSize("small" | "medium" | "large")
+    function Window:SetGuiSize(name)
+        local map = { small = 0.88, medium = 1, large = 1.12 }
+        return Window:SetGuiScale(map[string.lower(tostring(name))] or 1)
     end
 
     -- ============ EXPORT / IMPORT CONFIG CODE ============
@@ -1905,7 +2113,7 @@ function AlatferaLib.CreateWindow(config)
             if type(param) == "number" then
                 return math.clamp(param, 8, 40)
             end
-            return default
+            return default + fontBoost
         end
 
         -- Nút reset cấu hình: CreateResetConfigButton(tên, callbackThêm, confirm, chữNút)
@@ -2190,7 +2398,7 @@ function AlatferaLib.CreateWindow(config)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
             local B = Instance.new("TextButton")
-            B.Size = UDim2.new(1, -10, 0, math.max(38, fs + 22))
+            B.Size = UDim2.new(1, -10, 0, math.max(rowMin, fs + rowPad))
             B.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
             B.Text = btnText; B.TextColor3 = Color3.fromRGB(240, 240, 245)
             B.Font = Enum.Font.Gotham
@@ -2205,6 +2413,7 @@ function AlatferaLib.CreateWindow(config)
             AttachButtonEffects(B, Track, Color3.fromRGB(34, 40, 56))
             AddTooltip(B, tooltip)
             Track(B.MouseButton1Click:Connect(function()
+                if suppressClick then suppressClick = false; return end
                 CreateRipple(B)
                 TweenService:Create(B, TweenInfo.new(0.1), {BackgroundColor3 = Window.ThemeColor}):Play()
                 task.wait(0.1)
@@ -2225,7 +2434,7 @@ function AlatferaLib.CreateWindow(config)
             if flagName and savedData[flagName] ~= nil then defaultState = savedData[flagName] end
             local state = defaultState or false
             local T = Instance.new("TextButton")
-            T.Size = UDim2.new(1, -10, 0, math.max(38, fs + 22))
+            T.Size = UDim2.new(1, -10, 0, math.max(rowMin, fs + rowPad))
             T.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
             T.Text = ""
             T.AutoButtonColor = false
@@ -2267,6 +2476,7 @@ function AlatferaLib.CreateWindow(config)
                 callback(state)
             end
             Track(T.MouseButton1Click:Connect(function()
+                if suppressClick then suppressClick = false; return end
                 if confirmCfg and Window:IsConfirmEnabled() then
                     Window:ConfirmAction(confirmCfg, doToggle)
                 else
@@ -2297,7 +2507,7 @@ function AlatferaLib.CreateWindow(config)
             showInput = showInput or false
             local range = math.max(maxVal - minVal, 1)
             local SF = Instance.new("Frame")
-            SF.Size = UDim2.new(1, -10, 0, math.max(48, fs + 35))
+            SF.Size = UDim2.new(1, -10, 0, math.max(rowMin + 10, fs + rowPad + 13))
             SF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
             SF.Parent = container
             local SFC = Instance.new("UICorner"); SFC.CornerRadius = UDim.new(0, cornerRadius); SFC.Parent = SF
@@ -2434,7 +2644,7 @@ function AlatferaLib.CreateWindow(config)
             options = options or {}
             local currentChoice = defaultOption or options[1] or "Chưa chọn"
             local MAX_HEIGHT = 150
-            local headerH = math.max(38, fs + 22)
+            local headerH = math.max(rowMin, fs + rowPad)
             local DF = Instance.new("Frame")
             DF.Size = UDim2.new(1, -10, 0, headerH)
             DF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
@@ -2535,7 +2745,7 @@ function AlatferaLib.CreateWindow(config)
                 if #l <= 2 then return table.concat(l, ", ") .. " ▼" end
                 return l[1] .. " +" .. (#l - 1) .. " ▼"
             end
-            local headerH = math.max(38, fs + 22)
+            local headerH = math.max(rowMin, fs + rowPad)
             local DF = Instance.new("Frame")
             DF.Size = UDim2.new(1, -10, 0, headerH)
             DF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
@@ -2661,7 +2871,7 @@ function AlatferaLib.CreateWindow(config)
                 return nil
             end
             currentColor = loadSaved() or currentColor
-            local rowH = math.max(38, fs + 22)
+            local rowH = math.max(rowMin, fs + rowPad)
             local PF = Instance.new("Frame")
             PF.Size = UDim2.new(1, -10, 0, rowH)
             PF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
@@ -2831,7 +3041,7 @@ function AlatferaLib.CreateWindow(config)
             local fs = getFontSize(fontSize, 13)
             local defaultVal = ""
             if flagName and savedData[flagName] ~= nil then defaultVal = tostring(savedData[flagName]) end
-            local rowH = math.max(38, fs + 22)
+            local rowH = math.max(rowMin, fs + rowPad)
             local BF = Instance.new("Frame")
             BF.Size = UDim2.new(1, -10, 0, rowH)
             BF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
@@ -2889,15 +3099,21 @@ function AlatferaLib.CreateWindow(config)
         end
 
         -- CreateKeybind(text, flag, defaultKey, callback, tooltip, fontSize)
-        function W:CreateKeybind(labelText, flagName, defaultKey, callback, tooltip, fontSize)
+        -- CreateKeybind(text, flag, defaultKey, callback, tooltip, fontSize, onPress)
+        --  callback: chạy khi người dùng GÁN phím mới
+        --  onPress : chạy khi nhấn phím (máy tính) hoặc bấm nút ảo (điện thoại). Điện thoại + onPress => widget
+        --            đổi thành công tắc "Nút ảo": bật thì hiện một nút tròn nổi trên màn hình, bấm là chạy onPress
+        function W:CreateKeybind(labelText, flagName, defaultKey, callback, tooltip, fontSize, onPress)
             callback = callback or function() end
             local fs = getFontSize(fontSize, 13)
             local currentKey = defaultKey or Enum.KeyCode.Unknown
             if flagName and savedData[flagName] then
                 pcall(function() currentKey = Enum.KeyCode[savedData[flagName]] or currentKey end)
             end
+            local virtualMode = isMobile and type(onPress) == "function"
             local listening = false
-            local rowH = math.max(38, fs + 22)
+            local assignedAt = 0
+            local rowH = math.max(rowMin, fs + rowPad)
             local BF = Instance.new("Frame")
             BF.Size = UDim2.new(1, -10, 0, rowH)
             BF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
@@ -2916,38 +3132,82 @@ function AlatferaLib.CreateWindow(config)
             Lbl.Font = Enum.Font.Gotham
             Lbl.TextSize = fs
             Lbl.Parent = BF
-            local kbH = math.min(26, rowH - 10)
+            local kbH = math.min(rowH - 10, 26 + fontBoost * 2)
+            local kbW = virtualMode and 124 or 100
             local KB = Instance.new("TextButton")
-            KB.Size = UDim2.new(0, 100, 0, kbH); KB.Position = UDim2.new(1, -110, 0.5, -(kbH/2))
+            KB.Size = UDim2.new(0, kbW, 0, kbH); KB.Position = UDim2.new(1, -(kbW + 10), 0.5, -(kbH / 2))
             KB.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
             KB.Text = currentKey.Name
             KB.TextColor3 = themeColor
             KB.Font = Enum.Font.GothamBold; KB.TextSize = fs - 1
+            KB.AutoButtonColor = false
             KB.Parent = BF
             local KBC = Instance.new("UICorner"); KBC.CornerRadius = UDim.new(0, cornerRadius - 2); KBC.Parent = KB
             registerTheme(KB, "TextColor3")
+
+            local function safePress()
+                local ok, err = pcall(onPress)
+                if not ok then warn("[Alatfera] Loi trong onPress cua Keybind: " .. tostring(err)) end
+            end
+
+            -- Chế độ nút ảo (điện thoại)
+            local vFlag = flagName and (flagName .. "_VirtualBtn") or nil
+            local vOn, vBtn = false, nil
+            local function setVirtual(on)
+                if not virtualMode then return end
+                vOn = on and true or false
+                if vOn and not vBtn then
+                    local vs = ScreenGui.AbsoluteSize
+                    vBtn = makeFloatButton(labelText, 56, Vector2.new(math.max(20, vs.X - 150), math.max(60, vs.Y * 0.5)), safePress)
+                    vBtn.TextSize = 11
+                end
+                if vBtn then vBtn.Visible = vOn end
+                KB.Text = vOn and "Nút ảo: BẬT" or "Nút ảo: TẮT"
+                KB.TextColor3 = vOn and Window.ThemeColor or Color3.fromRGB(170, 175, 190)
+                if vFlag then savedData[vFlag] = vOn; SaveCurrentConfig() end
+            end
+
             Track(KB.MouseButton1Click:Connect(function()
+                if virtualMode then
+                    setVirtual(not vOn)
+                    return
+                end
                 listening = true
                 KB.Text = "Nhấn phím..."
                 KB.TextColor3 = Color3.fromRGB(255, 180, 80)
             end))
             Track(UserInputService.InputBegan:Connect(function(input, gpe)
-                if not listening then return end
-                if input.UserInputType == Enum.UserInputType.Keyboard then
-                    currentKey = input.KeyCode
-                    listening = false
-                    KB.Text = currentKey.Name
-                    KB.TextColor3 = Window.ThemeColor
-                    if flagName then savedData[flagName] = currentKey.Name; SaveCurrentConfig() end
-                    callback(currentKey)
+                if listening then
+                    if input.UserInputType == Enum.UserInputType.Keyboard then
+                        currentKey = input.KeyCode
+                        listening = false
+                        assignedAt = tick()
+                        KB.Text = currentKey.Name
+                        KB.TextColor3 = Window.ThemeColor
+                        if flagName then savedData[flagName] = currentKey.Name; SaveCurrentConfig() end
+                        callback(currentKey)
+                    end
+                    return
+                end
+                -- Máy tính: nhấn đúng phím đã gán thì chạy onPress
+                if onPress and not virtualMode and not gpe and modalCount == 0
+                    and input.UserInputType == Enum.UserInputType.Keyboard
+                    and currentKey ~= Enum.KeyCode.Unknown and input.KeyCode == currentKey
+                    and tick() - assignedAt > 0.25 then
+                    safePress()
                 end
             end))
+
+            if virtualMode then
+                setVirtual(vFlag and savedData[vFlag] == true or false)
+            end
             if flagName then
                 table.insert(presetAppliers, function()
+                    if virtualMode and vFlag then setVirtual(savedData[vFlag] == true) end
                     if savedData[flagName] then
                         pcall(function()
                             currentKey = Enum.KeyCode[savedData[flagName]]
-                            KB.Text = currentKey.Name
+                            if not virtualMode then KB.Text = currentKey.Name end
                             callback(currentKey)
                         end)
                     end
@@ -2957,10 +3217,14 @@ function AlatferaLib.CreateWindow(config)
                 GetKey = function() return currentKey end,
                 SetKey = function(k)
                     currentKey = k
-                    KB.Text = k.Name
+                    assignedAt = tick()
+                    if not virtualMode then KB.Text = k.Name end
                     if flagName then savedData[flagName] = k.Name; SaveCurrentConfig() end
                     callback(k)
                 end,
+                ShowVirtual = function() setVirtual(true) end,
+                HideVirtual = function() setVirtual(false) end,
+                IsVirtual = function() return vOn end,
             }
         end
 
@@ -3049,12 +3313,12 @@ function AlatferaLib.CreateWindow(config)
     function Window:CreateTab(tabName, iconEmoji)
         local displayText = iconEmoji and (iconEmoji .. "  " .. tabName) or ("  " .. tabName)
         local TB = Instance.new("TextButton")
-        TB.Size = UDim2.new(1, -6, 0, 36)
+        TB.Size = UDim2.new(1, -6, 0, tabH)
         TB.BackgroundColor3 = FirstTab and tabTint(themeColor) or Color3.fromRGB(19, 21, 28)
         TB.Text = displayText
         TB.TextColor3 = FirstTab and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(140, 145, 160)
         TB.TextXAlignment = Enum.TextXAlignment.Left
-        TB.Font = Enum.Font.GothamBold; TB.TextSize = 13
+        TB.Font = Enum.Font.GothamBold; TB.TextSize = 13 + fontBoost
         TB.AutoButtonColor = false
         TB.Parent = Sidebar
         local TBPad = Instance.new("UIPadding"); TBPad.PaddingLeft = UDim.new(0, 12); TBPad.Parent = TB
