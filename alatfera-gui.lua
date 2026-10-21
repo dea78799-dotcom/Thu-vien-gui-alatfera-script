@@ -1,9 +1,3 @@
---[[
-    ============================================
-    ALATFERA LIB V14 - PRO EDITION (FIXED + Rainbow Stroke, Reset Config, Discord Webhook)
-    Notify X, History, Mini Search, Copy/Paste Config
-    ============================================
-]]
 
 local AlatferaLib = {}
 AlatferaLib.__index = AlatferaLib
