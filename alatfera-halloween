@@ -292,8 +292,12 @@ local function AttachButtonEffects(button, trackFn, hoverColor)
     end))
 end
 
+local LIB_BUILD = "2026-10-25-halloween2"
+AlatferaLib.Build = LIB_BUILD
+
 function AlatferaLib.CreateWindow(config)
     config = config or {}
+    print("[Alatfera] ban thu vien: " .. LIB_BUILD)
     local hubTitle       = config.Title or "Alatfera Script"
     local hubVersion     = config.Version or "v14.0"
     local showPlaytime   = (config.ShowPlaytime == nil) and true or config.ShowPlaytime
@@ -354,11 +358,10 @@ function AlatferaLib.CreateWindow(config)
     local rowPad = touchUi and 26 or 22
     local tbSize = touchUi and 40 or 34               -- cỡ nút trên thanh trên cùng
     local tabH = touchUi and 42 or 36                 -- chiều cao nút tab
-    local winFracW = math.clamp(tonumber(config.WindowWidth) or 0.70, 0.3, 0.95)    -- cửa sổ chiếm bao nhiêu phần màn hình (0.3 đến 0.95)
-    local winFracH = math.clamp(tonumber(config.WindowHeight) or 0.78, 0.3, 0.95)
-    local winMax = Vector2.new(tonumber(config.WindowMaxWidth) or 760, tonumber(config.WindowMaxHeight) or 420)   -- kích thước tối đa (pixel)
-    local maxGuiScale = math.min(0.96 / winFracW, 0.96 / winFracH)
-    local guiScale = math.clamp(tonumber(config.GuiScale) or tonumber(savedData["_GuiScale"]) or 1, 0.7, maxGuiScale)
+    local winFracW = 0.70                              -- cỡ cửa sổ cố định (70% x 78% màn hình, tối đa 760x420)
+    local winFracH = 0.78
+    local winMax = Vector2.new(760, 420)
+    local guiScale = 1
     local showFloat = config.FloatButton
     if showFloat == nil or showFloat == "auto" then showFloat = isMobile or (config.FloatButtonImage ~= nil) end
     local tbTotal = 8 + 8 * (tbSize + 2)
@@ -381,6 +384,7 @@ function AlatferaLib.CreateWindow(config)
     local modalCount = 0   -- > 0 khi có hộp xác nhận đang mở
     local destroyed = false
     local destroyCallbacks = {}
+    local H = {}   -- gom mọi biến Halloween vào một bảng (Lua giới hạn 200 biến local trong một hàm)
     local themeTargets = {}
 
     local function registerTheme(instance, property)
@@ -1147,7 +1151,7 @@ function AlatferaLib.CreateWindow(config)
     local currentToggleKey = config.ToggleKey or Enum.KeyCode.RightControl
     Track(HelpBtn.MouseButton1Click:Connect(function()
         Window:Notify({
-            Title = "Hướng Dẫn",
+            Title = "Hướng Dẫn (bản " .. LIB_BUILD .. ")",
             Text = "• Kéo GUI bằng thanh trên cùng.\n• 🔒 Khóa GUI.\n• 🔍 Mở khung tìm kiếm.\n• 📜 Xem lịch sử thông báo.\n" .. (isMobile and "• Bấm nút tròn để ẩn/hiện GUI." or ("• " .. currentToggleKey.Name .. " ẩn/hiện GUI.")),
             Duration = 5,
         })
@@ -1949,10 +1953,14 @@ function AlatferaLib.CreateWindow(config)
     Track(PPApply.MouseButton1Click:Connect(function()
         local text = PPInput.Text
         -- Dán chữ halloween / 🎃 / alatfera_halloween (hoa hay thường đều được) để kích hoạt sự kiện Halloween
-        if Window:IsHalloweenCode(text) then
+        if H.isCode(text) then
             PPInput.Text = ""
             PastePanel.Visible = false
-            Window:StartHalloween()
+            local okH, errH = pcall(H.start)
+            if not okH then
+                warn("[Alatfera] Loi Halloween: " .. tostring(errH))
+                Window:Notify({ Title = "Lỗi Halloween", Text = tostring(errH):sub(1, 140), Type = "error", Duration = 8 })
+            end
             return
         end
         if text:gsub("%s", "") == "" then
@@ -2135,7 +2143,7 @@ function AlatferaLib.CreateWindow(config)
         return false
     end
 
-    -- ============ THIẾT BỊ + CỠ GIAO DIỆN + NÚT TRÒN ============
+    -- ============ THIẾT BỊ + NÚT TRÒN ============
     function Window:GetDevice() return isMobile and "mobile" or "pc" end
     function Window:IsMobile() return isMobile end
     function Window:SetFloatButton(b) setFloat(b) end
@@ -2146,24 +2154,6 @@ function AlatferaLib.CreateWindow(config)
         setFloatImage(src)
     end
     function Window:IsFloatButton() return showFloat end
-
-    -- Đổi cỡ toàn bộ GUI (0.7 đến mức tối đa còn vừa màn hình). Được lưu lại cho lần sau.
-    function Window:SetGuiScale(f)
-        f = math.clamp(tonumber(f) or 1, 0.7, maxGuiScale)
-        guiScale = f
-        savedData["_GuiScale"] = f
-        SaveCurrentConfig()
-        if MainFrame.Visible then
-            TweenService:Create(mainScale, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Scale = f}):Play()
-        end
-        return f
-    end
-    function Window:GetGuiScale() return guiScale end
-    -- Window:SetGuiSize("small" | "medium" | "large")
-    function Window:SetGuiSize(name)
-        local map = { small = 0.88, medium = 1, large = 1.12 }
-        return Window:SetGuiScale(map[string.lower(tostring(name))] or 1)
-    end
 
     -- ============ EXPORT / IMPORT CONFIG CODE ============
     function Window:SetConfigExpireDays(n)
@@ -3859,14 +3849,13 @@ function AlatferaLib.CreateWindow(config)
     --           -> GUI đổi sang giao diện Halloween (nền ảnh, nút đẹp hơn, màu cam). Mọi tính năng vẫn giữ nguyên.
     -- Lưu ý: link Discord có hạn dùng. Nên thay bằng link ảnh lâu dài (ví dụ link raw trên GitHub của bạn):
     --        HalloweenCoverImage = 'https://...', HalloweenBackgroundImage = 'https://...'
-    local H = {}   -- gom mọi biến Halloween vào một bảng (Lua giới hạn 200 biến local trong một hàm)
-    H.coverUrl = "https://cdn.discordapp.com/attachments/1548672637331443732/1562461552781819995/1792577711317.png?ex=6ade07b7&is=6adcb637&hm=469943f596da2be7d8a208253fcb2a1f43c8036db050ba809725f49bdb0aea31&"
-    H.bgUrl = "https://cdn.discordapp.com/attachments/1548672637331443732/1563724854555844781/1792891440914.png?ex=6adeabc1&is=6add5a41&hm=0448ea8181d210ddca41b3ff27e7a8d797f3be31bc9e8a4fce7c9603b712cce3&"
+    H.coverUrl = "https://raw.githubusercontent.com/dea78799-dotcom/Thu-vien-gui-alatfera-script/main/1792577711317.png"
+    H.bgUrl = "https://raw.githubusercontent.com/dea78799-dotcom/Thu-vien-gui-alatfera-script/main/1792891443447.png"
     H.coverSrc = config.HalloweenCoverImage or H.coverUrl
     H.bgSrc = config.HalloweenBackgroundImage or H.bgUrl
-    H.delay = tonumber(config.HalloweenCoverDelay) or 3          -- chờ bao nhiêu giây rồi mới hiện ảnh bìa
-    H.hold = tonumber(config.HalloweenCoverHold) or 1            -- ảnh bìa nằm yên bao nhiêu giây trước khi biến mất
-    H.dim = math.clamp(tonumber(config.HalloweenDim) or 0.5, 0, 0.9)   -- độ tối phủ lên ảnh nền để chữ dễ đọc
+    H.delay = 3          -- chờ 3 giây rồi mới hiện ảnh bìa
+    H.hold = 1            -- ảnh bìa nằm yên 1 giây trước khi biến mất
+    H.dim = 0.5           -- độ tối phủ lên ảnh nền để chữ dễ đọc
     H.orange = Color3.fromRGB(255, 128, 0)
     H.strokeCol = Color3.fromRGB(235, 110, 20)
 
@@ -4015,8 +4004,6 @@ function AlatferaLib.CreateWindow(config)
             if Window:IsParticlesEnabled() then
                 Window:SetParticles(false); Window:SetParticles(true)
             end
-            savedData["_Halloween"] = true
-            SaveCurrentConfig()
             H.startBgDownload()
             H.applyBg()
         else
@@ -4041,8 +4028,6 @@ function AlatferaLib.CreateWindow(config)
             if Window:IsParticlesEnabled() then
                 Window:SetParticles(false); Window:SetParticles(true)
             end
-            savedData["_Halloween"] = nil
-            SaveCurrentConfig()
         end
     end
 
@@ -4104,27 +4089,22 @@ function AlatferaLib.CreateWindow(config)
         Cover:Destroy()
     end
 
-    -- Có phải chữ kích hoạt không: halloween / 🎃 / alatfera_halloween (hoa hay thường đều được)
-    function Window:IsHalloweenCode(text)
-        local t = tostring(text or "")
-        t = (t:gsub("%s", ""))
-        t = (t:gsub("\239\184\143", ""))   -- bỏ ký tự biến thể emoji (U+FE0F)
-        if t == "" then return false end
-        local lower = t:lower()
-        if lower == "halloween" or lower == "alatfera_halloween" then return true end
-        local rest = (t:gsub("\240\159\142\131", ""))   -- 🎃
-        return rest == ""   -- chỉ gồm toàn quả bí
+    -- Có phải chữ kích hoạt không: halloween / 🎃 / alatfera_halloween (hoa hay thường đều được, có thể kèm quả bí)
+    function H.isCode(text)
+        local original = tostring(text or "")
+        local t = (original:gsub("%s", ""))
+        t = (t:gsub("\239\184\143", ""))        -- bỏ ký tự biến thể emoji (U+FE0F)
+        t = (t:gsub("\240\159\142\131", ""))    -- bỏ quả bí 🎃
+        t = t:lower()
+        if t == "" then
+            -- không còn gì sau khi bỏ quả bí: đúng nếu ban đầu có ít nhất một quả bí
+            return original:find("\240\159\142\131", 1, true) ~= nil
+        end
+        return t == "halloween" or t == "alatfera_halloween"
     end
 
-    function Window:IsHalloween() return H.active end
-
-    -- Bật/tắt giao diện Halloween bằng code (không có phần mở màn)
-    function Window:SetHalloween(on)
-        H.setStyle(on and true or false)
-    end
-
-    -- Chạy trọn sự kiện: thông báo -> chờ -> ảnh bìa -> giao diện Halloween
-    function Window:StartHalloween()
+    -- Chạy trọn sự kiện: thông báo -> chờ 3 giây -> ảnh bìa -> giao diện Halloween
+    function H.start()
         if destroyed then return end
         if H.active then
             Window:Notify({ Title = "🎃 Halloween", Text = "Sự kiện Halloween đã được bật rồi!", Type = "info" })
@@ -4142,24 +4122,32 @@ function AlatferaLib.CreateWindow(config)
 
         -- Tải sẵn hai ảnh trong lúc chờ
         local cover = { done = false, id = nil }
-        resolveImage(H.coverSrc, function(id) cover.id = id; cover.done = true end)
-        H.startBgDownload()
+        local okR, errR = pcall(function()
+            resolveImage(H.coverSrc, function(id) cover.id = id; cover.done = true end)
+            H.startBgDownload()
+        end)
+        if not okR then cover.done = true; warn("[Alatfera] Loi tai anh Halloween: " .. tostring(errR)) end
 
         task.spawn(function()
-            task.wait(H.delay)
-            local waited = 0
-            while not cover.done and waited < 8 do task.wait(0.1); waited = waited + 0.1 end
-            if destroyed then return end
-            H.playCover(cover.id)
-            if destroyed then return end
-            H.setStyle(true)
+            local ok, err = pcall(function()
+                task.wait(H.delay)
+                local waited = 0
+                while not cover.done and waited < 8 do task.wait(0.1); waited = waited + 0.1 end
+                if destroyed then return end
+                H.playCover(cover.id)
+                if destroyed then return end
+                H.setStyle(true)
+            end)
             H.running = false
+            if not ok then
+                warn("[Alatfera] Loi Halloween: " .. tostring(err))
+                local stray = ScreenGui:FindFirstChild("HalloweenCover")   -- gỡ lớp phủ nếu bị lỗi giữa chừng
+                if stray then stray:Destroy() end
+                if not destroyed then
+                    Window:Notify({ Title = "Lỗi Halloween", Text = tostring(err):sub(1, 140), Type = "error", Duration = 8 })
+                end
+            end
         end)
-    end
-
-    -- Bật sẵn khi mở nếu đã kích hoạt trước đó (hoặc đặt Halloween = true trong CreateWindow)
-    if config.Halloween == true or savedData["_Halloween"] == true then
-        H.setStyle(true)
     end
 
     return Window
