@@ -385,6 +385,7 @@ function AlatferaLib.CreateWindow(config)
     local destroyed = false
     local destroyCallbacks = {}
     local H = {}   -- gom mọi biến Halloween vào một bảng (Lua giới hạn 200 biến local trong một hàm)
+    local A = { items = {}, buttons = {} }   -- sổ đăng ký các công tắc + bảng "Đang bật"
     local themeTargets = {}
 
     local function registerTheme(instance, property)
@@ -2410,6 +2411,262 @@ function AlatferaLib.CreateWindow(config)
             return OuterF
         end
 
+        -- CreateChoice(text, flag, options, default, callback, tooltip, fontSize)
+        -- Hàng nút chọn nhanh: chọn 1 trong 2 đến 4 lựa chọn, ví dụ {'Dễ', 'Vừa', 'Khó'}.
+        -- callback(lựa chọn, số thứ tự). Trả về: Get, GetIndex, Set
+        function W:CreateChoice(choiceText, flagName, options, defaultOption, callback, tooltip, fontSize)
+            callback = callback or function() end
+            local fs = getFontSize(fontSize, 13)
+            local opts = {}
+            for i, o in ipairs(options or {}) do
+                if i > 4 then warn("[Alatfera] CreateChoice chi nhan toi da 4 lua chon"); break end
+                opts[#opts + 1] = tostring(o)
+            end
+            if #opts == 0 then opts[1] = "-" end
+            local n = #opts
+            local function indexOf(v)
+                for i, o in ipairs(opts) do if o == tostring(v) then return i end end
+                return nil
+            end
+            local current = 1
+            if flagName and savedData[flagName] ~= nil then
+                current = indexOf(savedData[flagName]) or 1
+            elseif defaultOption ~= nil then
+                current = indexOf(defaultOption) or 1
+            end
+
+            local labelH = fs + 10
+            local barH = math.max(32, fs + 18)
+            local CF = Instance.new("Frame")
+            CF.Size = UDim2.new(1, -10, 0, labelH + barH + 14)
+            CF.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            CF.Parent = container
+            local CFC = Instance.new("UICorner"); CFC.CornerRadius = UDim.new(0, cornerRadius); CFC.Parent = CF
+            if enableStroke then
+                local CFS = NewStroke(); CFS.Color = strokeColor; CFS.Thickness = 1; CFS.Parent = CF
+            end
+            CF:SetAttribute("SearchText", string.lower(choiceText))
+            AddTooltip(CF, tooltip or choiceText)
+
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size = UDim2.new(1, -28, 0, labelH); Lbl.Position = UDim2.new(0, 14, 0, 6)
+            Lbl.BackgroundTransparency = 1; Lbl.Text = choiceText
+            Lbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+            Lbl.TextXAlignment = Enum.TextXAlignment.Left
+            Lbl.Font = Enum.Font.Gotham; Lbl.TextSize = fs
+            Lbl.Parent = CF
+
+            local Bar = Instance.new("Frame")
+            Bar.Size = UDim2.new(1, -20, 0, barH); Bar.Position = UDim2.new(0, 10, 0, labelH + 8)
+            Bar.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
+            Bar.BorderSizePixel = 0
+            Bar.Parent = CF
+            local BarC = Instance.new("UICorner"); BarC.CornerRadius = UDim.new(0, math.max(cornerRadius - 2, 6)); BarC.Parent = Bar
+            if enableStroke then
+                local BarS = NewStroke(); BarS.Color = strokeColor; BarS.Thickness = 1; BarS.Parent = Bar
+            end
+
+            -- Thanh màu chạy dưới lựa chọn đang chọn (đổi màu theo theme)
+            local Ind = Instance.new("Frame")
+            Ind.Size = UDim2.new(1 / n, -6, 1, -6)
+            Ind.Position = UDim2.new((current - 1) / n, 3, 0, 3)
+            Ind.BackgroundColor3 = themeColor
+            Ind.BorderSizePixel = 0
+            Ind.ZIndex = 1
+            Ind.Parent = Bar
+            local IndC = Instance.new("UICorner"); IndC.CornerRadius = UDim.new(0, math.max(cornerRadius - 4, 4)); IndC.Parent = Ind
+            registerTheme(Ind, "BackgroundColor3")
+
+            local btns = {}
+            local function paint()
+                for i, b in ipairs(btns) do
+                    b.TextColor3 = (i == current) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 155, 170)
+                end
+            end
+            local function select(i, fromUser)
+                if i < 1 or i > n then return end
+                local changed = (i ~= current)
+                current = i
+                TweenService:Create(Ind, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new((i - 1) / n, 3, 0, 3)}):Play()
+                paint()
+                if flagName then savedData[flagName] = opts[i]; SaveCurrentConfig() end
+                if fromUser and (changed or true) then callback(opts[i], i) end
+            end
+            for i, name in ipairs(opts) do
+                local OB = Instance.new("TextButton")
+                OB.Size = UDim2.new(1 / n, 0, 1, 0)
+                OB.Position = UDim2.new((i - 1) / n, 0, 0, 0)
+                OB.BackgroundTransparency = 1
+                OB.Text = name
+                OB.Font = Enum.Font.GothamBold; OB.TextSize = fs - 1
+                OB.TextTruncate = Enum.TextTruncate.AtEnd
+                OB.AutoButtonColor = false
+                OB.ZIndex = 2
+                OB.Parent = Bar
+                btns[i] = OB
+                Track(OB.MouseButton1Click:Connect(function()
+                    if suppressClick then suppressClick = false; return end
+                    select(i, true)
+                end))
+            end
+            paint()
+            if flagName then
+                table.insert(presetAppliers, function()
+                    local i = savedData[flagName] ~= nil and indexOf(savedData[flagName]) or nil
+                    if i and i ~= current then select(i, true) end
+                end)
+            end
+            local obj = {}
+            function obj:Get() return opts[current] end
+            function obj:GetIndex() return current end
+            function obj:Set(v)
+                local i = (type(v) == "number") and v or indexOf(v)
+                if i then select(i, true) end
+            end
+            return obj
+        end
+
+        -- CreateCopyBox(text, value, show, tooltip, fontSize)
+        -- Khung chữ có nút Copy (link, ID, ghi chú...). Mặc định CHE nội dung (••••••). Đặt show = true để hiện luôn.
+        -- Nút Copy luôn chép nội dung thật. Trả về: SetValue, GetValue, SetShow, IsShowing
+        function W:CreateCopyBox(boxLabel, value, show, tooltip, fontSize)
+            local fs = getFontSize(fontSize, 13)
+            local current = tostring(value or "")
+            local showing = (show == true)
+            local rowH = math.max(rowMin, fs + rowPad)
+            local innerH = math.min(rowH - 10, 26 + fontBoost * 2)
+            local F = Instance.new("Frame")
+            F.Size = UDim2.new(1, -10, 0, rowH)
+            F.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            F.Parent = container
+            local FCr = Instance.new("UICorner"); FCr.CornerRadius = UDim.new(0, cornerRadius); FCr.Parent = F
+            if enableStroke then
+                local FSt = NewStroke(); FSt.Color = strokeColor; FSt.Thickness = 1; FSt.Parent = F
+            end
+            F:SetAttribute("SearchText", string.lower(boxLabel))   -- chỉ tìm theo tên, không lộ nội dung bị che
+            AddTooltip(F, tooltip or boxLabel)
+
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size = UDim2.new(0.3, -10, 1, 0); Lbl.Position = UDim2.new(0, 14, 0, 0)
+            Lbl.BackgroundTransparency = 1; Lbl.Text = boxLabel
+            Lbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+            Lbl.TextXAlignment = Enum.TextXAlignment.Left
+            Lbl.TextTruncate = Enum.TextTruncate.AtEnd
+            Lbl.Font = Enum.Font.Gotham; Lbl.TextSize = fs
+            Lbl.Parent = F
+
+            local VF = Instance.new("Frame")
+            VF.Size = UDim2.new(0.7, -92, 0, innerH); VF.Position = UDim2.new(0.3, 0, 0.5, -(innerH / 2))
+            VF.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
+            VF.BorderSizePixel = 0
+            VF.Parent = F
+            local VFC = Instance.new("UICorner"); VFC.CornerRadius = UDim.new(0, math.max(cornerRadius - 2, 6)); VFC.Parent = VF
+            local Val = Instance.new("TextLabel")
+            Val.Size = UDim2.new(1, -16, 1, 0); Val.Position = UDim2.new(0, 8, 0, 0)
+            Val.BackgroundTransparency = 1
+            Val.TextColor3 = Color3.fromRGB(200, 205, 220)
+            Val.TextXAlignment = Enum.TextXAlignment.Left
+            Val.TextTruncate = Enum.TextTruncate.AtEnd
+            Val.Font = Enum.Font.Code; Val.TextSize = fs - 1
+            Val.Parent = VF
+
+            local CB = Instance.new("TextButton")
+            CB.Size = UDim2.new(0, 70, 0, innerH); CB.Position = UDim2.new(1, -80, 0.5, -(innerH / 2))
+            CB.BackgroundColor3 = themeColor
+            CB.Text = "Copy"
+            CB.TextColor3 = Color3.fromRGB(255, 255, 255)
+            CB.Font = Enum.Font.GothamBold; CB.TextSize = fs - 1
+            CB.AutoButtonColor = false
+            CB.Parent = F
+            local CBC = Instance.new("UICorner"); CBC.CornerRadius = UDim.new(0, math.max(cornerRadius - 2, 6)); CBC.Parent = CB
+            registerTheme(CB, "BackgroundColor3")
+            AttachButtonEffects(CB, Track)
+
+            local function render()
+                if current == "" then
+                    Val.Text = "(trống)"
+                elseif showing then
+                    Val.Text = current
+                else
+                    Val.Text = string.rep("•", 12)   -- che nội dung, không lộ cả độ dài
+                end
+            end
+            render()
+
+            local busy = false
+            Track(CB.MouseButton1Click:Connect(function()
+                if suppressClick then suppressClick = false; return end
+                if busy then return end
+                if not (setclipboard or toclipboard) then
+                    Window:Notify({ Title = "Không copy được", Text = "Executor không hỗ trợ clipboard.", Type = "warning" })
+                    return
+                end
+                CopyToClipboard(current)
+                busy = true
+                CB.Text = "✓ Đã copy"
+                task.wait(1.5)
+                CB.Text = "Copy"
+                busy = false
+            end))
+
+            local obj = {}
+            function obj:SetValue(v) current = tostring(v or ""); render() end
+            function obj:GetValue() return current end
+            function obj:SetShow(b) showing = (b == true); render() end
+            function obj:IsShowing() return showing end
+            return obj
+        end
+
+        -- CreateActiveButton(tooltip, fontSize)
+        -- Nút hiện các tính năng (công tắc) đang bật. Bấm vào mở bảng "Đang bật:" nằm trong cửa sổ chính.
+        function W:CreateActiveButton(tooltip, fontSize)
+            local fs = getFontSize(fontSize, 13)
+            local B = Instance.new("TextButton")
+            B.Size = UDim2.new(1, -10, 0, math.max(rowMin, fs + rowPad))
+            B.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            B.Text = ""
+            B.AutoButtonColor = false
+            B.Parent = container
+            local BCr = Instance.new("UICorner"); BCr.CornerRadius = UDim.new(0, cornerRadius); BCr.Parent = B
+            if enableStroke then
+                local BSt = NewStroke(); BSt.Color = strokeColor; BSt.Thickness = 1; BSt.Parent = B
+            end
+            B:SetAttribute("SearchText", "đang bật")
+            AttachButtonEffects(B, Track, Color3.fromRGB(30, 35, 48))
+            AddTooltip(B, tooltip or "Xem và tắt các tính năng đang bật")
+
+            local Dot = Instance.new("Frame")
+            Dot.Size = UDim2.new(0, 10, 0, 10); Dot.Position = UDim2.new(0, 14, 0.5, -5)
+            Dot.BackgroundColor3 = Color3.fromRGB(80, 85, 100); Dot.BorderSizePixel = 0
+            Dot.Parent = B
+            local DotC = Instance.new("UICorner"); DotC.CornerRadius = UDim.new(1, 0); DotC.Parent = Dot
+
+            local Lbl = Instance.new("TextLabel")
+            Lbl.Size = UDim2.new(1, -66, 1, 0); Lbl.Position = UDim2.new(0, 34, 0, 0)
+            Lbl.BackgroundTransparency = 1; Lbl.Text = "Đang bật: không có"
+            Lbl.TextColor3 = Color3.fromRGB(150, 155, 170)
+            Lbl.TextXAlignment = Enum.TextXAlignment.Left
+            Lbl.TextTruncate = Enum.TextTruncate.AtEnd
+            Lbl.Font = Enum.Font.Gotham; Lbl.TextSize = fs
+            Lbl.Parent = B
+
+            local Arrow = Instance.new("TextLabel")
+            Arrow.Size = UDim2.new(0, 22, 1, 0); Arrow.Position = UDim2.new(1, -30, 0, 0)
+            Arrow.BackgroundTransparency = 1; Arrow.Text = "›"
+            Arrow.TextColor3 = Color3.fromRGB(150, 155, 170)
+            Arrow.Font = Enum.Font.GothamBold; Arrow.TextSize = fs + 6
+            Arrow.Parent = B
+
+            Track(B.MouseButton1Click:Connect(function()
+                if suppressClick then suppressClick = false; return end
+                CreateRipple(B)
+                A.openPanel()
+            end))
+            A.buttons[#A.buttons + 1] = { label = Lbl, dot = Dot }
+            A.refresh()
+            return B
+        end
+
         function W:CreateLabel(text, tooltip, fontSize)
             local fs = getFontSize(fontSize, 12)
             local L = Instance.new("TextLabel")
@@ -2568,6 +2825,7 @@ function AlatferaLib.CreateWindow(config)
                 state = ns
                 TweenService:Create(Tr, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {BackgroundColor3 = state and Window.ThemeColor or Color3.fromRGB(50, 56, 72)}):Play()
                 TweenService:Create(K, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = state and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)}):Play()
+                if A.refresh then A.refresh() end
             end
             local function doToggle()
                 applyToggle(not state)
@@ -2593,6 +2851,7 @@ function AlatferaLib.CreateWindow(config)
             local obj = {}
             function obj:Set(v) applyToggle(v and true or false); if flagName then savedData[flagName] = state; SaveCurrentConfig() end; callback(state) end
             function obj:Get() return state end
+            A.register(toggleText, function() return state end, function(v) obj:Set(v) end)
             return obj
         end
 
@@ -3650,13 +3909,22 @@ function AlatferaLib.CreateWindow(config)
             K.BorderSizePixel = 0
             K.Parent = Tr
             local KC = Instance.new("UICorner"); KC.CornerRadius = UDim.new(1, 0); KC.Parent = K
-            Track(T.MouseButton1Click:Connect(function()
-                state = not state
+            local function applyMini(ns)
+                state = ns
                 TweenService:Create(Tr, TweenInfo.new(0.2), {BackgroundColor3 = state and Window.ThemeColor or Color3.fromRGB(50, 56, 72)}):Play()
                 TweenService:Create(K, TweenInfo.new(0.2, Enum.EasingStyle.Back), {Position = state and UDim2.new(1, -14, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)}):Play()
+                if A.refresh then A.refresh() end
+            end
+            Track(T.MouseButton1Click:Connect(function()
+                applyMini(not state)
                 if flagName then savedData[flagName] = state; SaveCurrentConfig() end
                 callback(state)
             end))
+            A.register(text, function() return state end, function(v)
+                applyMini(v and true or false)
+                if flagName then savedData[flagName] = state; SaveCurrentConfig() end
+                callback(state)
+            end)
             return T
         end
 
@@ -3843,6 +4111,204 @@ function AlatferaLib.CreateWindow(config)
         if ScreenGui then ScreenGui:Destroy() end   -- xóa luôn cửa sổ chính, Mini Window, khung thông tin, nút tròn, nút ảo, hộp xác nhận
     end
 
+    -- ============ NÚT VÀ BẢNG "ĐANG BẬT" ============
+    -- Sổ đăng ký: mỗi công tắc (trong Tab và Mini Window) tự đăng ký tên, cách đọc trạng thái và cách tắt.
+    function A.register(name, getFn, setFn)
+        A.items[#A.items + 1] = { name = tostring(name), get = getFn, set = setFn }
+        A.refresh()
+    end
+
+    function A.activeList()
+        local list = {}
+        for _, it in ipairs(A.items) do
+            local ok, on = pcall(it.get)
+            if ok and on then list[#list + 1] = it end
+        end
+        return list
+    end
+
+    -- Chữ trên nút: tối đa 3 tính năng thì ghi tên, nhiều hơn thì ghi số lượng
+    function A.summary(list)
+        local n = #list
+        if n == 0 then return "Đang bật: không có" end
+        if n > 3 then return "Đang bật (" .. n .. " cái đang bật)..." end
+        local names = {}
+        for i, it in ipairs(list) do names[i] = it.name end
+        return "Đang bật: " .. table.concat(names, ", ")
+    end
+
+    function A.refresh()
+        local list = A.activeList()
+        local text = A.summary(list)
+        for i = #A.buttons, 1, -1 do
+            local b = A.buttons[i]
+            if b.label.Parent then
+                b.label.Text = text
+                b.label.TextColor3 = (#list > 0) and Color3.fromRGB(240, 240, 245) or Color3.fromRGB(150, 155, 170)
+                b.dot.BackgroundColor3 = (#list > 0) and Color3.fromRGB(45, 200, 110) or Color3.fromRGB(80, 85, 100)
+            else
+                table.remove(A.buttons, i)
+            end
+        end
+        if A.countLabel then A.countLabel.Text = "(" .. #list .. ")" end
+        if A.panel and A.panel.Visible then A.render(list) end
+    end
+
+    -- Dựng lại danh sách trong bảng: mỗi hàng là tên tính năng + công tắc. Tắt công tắc thì hàng biến mất và tính năng tắt theo.
+    function A.render(list)
+        if not A.panel then return end
+        for _, c in ipairs(A.list:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+        A.empty.Visible = (#list == 0)
+        for idx, it in ipairs(list) do
+            local Row = Instance.new("Frame")
+            Row.Name = "ActiveRow"
+            Row.LayoutOrder = idx
+            Row.Size = UDim2.new(1, -6, 0, math.max(40, rowMin - 4))
+            Row.BackgroundColor3 = Color3.fromRGB(24, 28, 38)
+            Row.BorderSizePixel = 0
+            Row.Parent = A.list
+            local RC = Instance.new("UICorner"); RC.CornerRadius = UDim.new(0, math.max(cornerRadius - 2, 6)); RC.Parent = Row
+            if enableStroke then
+                local RS = NewStroke(); RS.Color = strokeColor; RS.Thickness = 1; RS.Parent = Row
+            end
+            local Dot = Instance.new("Frame")
+            Dot.Size = UDim2.new(0, 8, 0, 8); Dot.Position = UDim2.new(0, 12, 0.5, -4)
+            Dot.BackgroundColor3 = Color3.fromRGB(45, 200, 110); Dot.BorderSizePixel = 0
+            Dot.Parent = Row
+            local DC = Instance.new("UICorner"); DC.CornerRadius = UDim.new(1, 0); DC.Parent = Dot
+            local Nm = Instance.new("TextLabel")
+            Nm.Size = UDim2.new(1, -100, 1, 0); Nm.Position = UDim2.new(0, 30, 0, 0)
+            Nm.BackgroundTransparency = 1; Nm.Text = it.name
+            Nm.TextColor3 = Color3.fromRGB(240, 240, 245)
+            Nm.TextXAlignment = Enum.TextXAlignment.Left
+            Nm.TextTruncate = Enum.TextTruncate.AtEnd
+            Nm.Font = Enum.Font.Gotham; Nm.TextSize = 13 + fontBoost
+            Nm.Parent = Row
+            local Sw = Instance.new("TextButton")
+            Sw.Size = UDim2.new(0, 42, 0, 22); Sw.Position = UDim2.new(1, -52, 0.5, -11)
+            Sw.BackgroundColor3 = Window.ThemeColor
+            Sw.Text = ""
+            Sw.AutoButtonColor = false
+            Sw.Parent = Row
+            local SwC = Instance.new("UICorner"); SwC.CornerRadius = UDim.new(1, 0); SwC.Parent = Sw
+            local Kn = Instance.new("Frame")
+            Kn.Size = UDim2.new(0, 18, 0, 18); Kn.Position = UDim2.new(1, -20, 0.5, -9)
+            Kn.BackgroundColor3 = Color3.fromRGB(255, 255, 255); Kn.BorderSizePixel = 0
+            Kn.Parent = Sw
+            local KnC = Instance.new("UICorner"); KnC.CornerRadius = UDim.new(1, 0); KnC.Parent = Kn
+            Track(Sw.MouseButton1Click:Connect(function()
+                if Row:GetAttribute("Busy") then return end
+                Row:SetAttribute("Busy", true)
+                TweenService:Create(Sw, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(50, 56, 72)}):Play()
+                TweenService:Create(Kn, TweenInfo.new(0.12), {Position = UDim2.new(0, 2, 0.5, -9)}):Play()
+                task.delay(0.12, function()
+                    -- Tắt tính năng thật. Bảng tự dựng lại nên hàng này biến mất cùng lúc.
+                    local ok, err = pcall(it.set, false)
+                    if not ok then warn("[Alatfera] Loi khi tat tinh nang: " .. tostring(err)) end
+                end)
+            end))
+        end
+    end
+
+    function A.build()
+        local P = Instance.new("Frame")
+        P.Name = "ActivePanel"
+        P:SetAttribute("HSkip", true)            -- giao diện Halloween không làm trong suốt nền của bảng
+        P.Size = UDim2.new(1, -20, 1, -64)        -- nằm gọn trong cửa sổ chính, chừa thanh trên cùng để vẫn kéo được
+        P.Position = UDim2.new(0, 10, 0, 54)
+        P.BackgroundColor3 = Color3.fromRGB(17, 19, 26)
+        P.BorderSizePixel = 0
+        P.Active = true                           -- chặn chạm xuyên xuống các widget phía sau
+        P.ClipsDescendants = true
+        P.Visible = false
+        P.ZIndex = 60
+        P.Parent = MainFrame
+        local PC = Instance.new("UICorner"); PC.CornerRadius = UDim.new(0, cornerRadius); PC.Parent = P
+        if enableStroke then
+            local PS = NewStroke(); PS.Color = strokeColor; PS.Thickness = 1.5; PS.Parent = P
+        end
+
+        local Header = Instance.new("Frame")
+        Header.Size = UDim2.new(1, 0, 0, 44)
+        Header.BackgroundColor3 = Color3.fromRGB(22, 25, 34)
+        Header.BorderSizePixel = 0
+        Header.Parent = P
+        local HC = Instance.new("UICorner"); HC.CornerRadius = UDim.new(0, cornerRadius); HC.Parent = Header
+
+        local Title = Instance.new("TextLabel")
+        Title.Size = UDim2.new(0, 84, 1, 0); Title.Position = UDim2.new(0, 16, 0, 0)
+        Title.BackgroundTransparency = 1; Title.Text = "Đang bật:"
+        Title.TextColor3 = themeColor
+        Title.TextXAlignment = Enum.TextXAlignment.Left
+        Title.Font = Enum.Font.GothamBold; Title.TextSize = 15
+        Title.Parent = Header
+        registerTheme(Title, "TextColor3")
+
+        A.countLabel = Instance.new("TextLabel")
+        A.countLabel.Size = UDim2.new(0, 50, 1, 0); A.countLabel.Position = UDim2.new(0, 102, 0, 0)
+        A.countLabel.BackgroundTransparency = 1; A.countLabel.Text = "(0)"
+        A.countLabel.TextColor3 = Color3.fromRGB(150, 155, 170)
+        A.countLabel.TextXAlignment = Enum.TextXAlignment.Left
+        A.countLabel.Font = Enum.Font.Gotham; A.countLabel.TextSize = 13
+        A.countLabel.Parent = Header
+
+        local Line = Instance.new("Frame")
+        Line.Size = UDim2.new(1, -24, 0, 2); Line.Position = UDim2.new(0, 12, 1, -2)
+        Line.BackgroundColor3 = themeColor; Line.BorderSizePixel = 0
+        Line.Parent = Header
+        registerTheme(Line, "BackgroundColor3")
+
+        local Close = Instance.new("TextButton")
+        Close.Size = UDim2.new(0, 34, 0, 34); Close.Position = UDim2.new(1, -42, 0.5, -17)
+        Close.BackgroundColor3 = Color3.fromRGB(255, 255, 255); Close.BackgroundTransparency = 1
+        Close.Text = "×"
+        Close.TextColor3 = Color3.fromRGB(245, 70, 90)
+        Close.Font = Enum.Font.GothamBold; Close.TextSize = 24
+        Close.AutoButtonColor = false
+        Close.Parent = Header
+        local CloseC = Instance.new("UICorner"); CloseC.CornerRadius = UDim.new(0, 8); CloseC.Parent = Close
+        Track(Close.MouseEnter:Connect(function() TweenService:Create(Close, TweenInfo.new(0.15), {BackgroundTransparency = 0.88}):Play() end))
+        Track(Close.MouseLeave:Connect(function() TweenService:Create(Close, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play() end))
+        Track(Close.MouseButton1Click:Connect(function() A.closePanel() end))
+
+        A.list = Instance.new("ScrollingFrame")
+        A.list.Size = UDim2.new(1, -16, 1, -60); A.list.Position = UDim2.new(0, 8, 0, 52)
+        A.list.BackgroundTransparency = 1; A.list.BorderSizePixel = 0
+        A.list.ScrollBarThickness = 3; A.list.ScrollBarImageColor3 = themeColor
+        A.list.CanvasSize = UDim2.new(0, 0, 0, 0)
+        A.list.Parent = P
+        local Layout = Instance.new("UIListLayout")
+        Layout.Padding = UDim.new(0, 6); Layout.SortOrder = Enum.SortOrder.LayoutOrder
+        Layout.Parent = A.list
+        Track(Layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            A.list.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + 8)
+        end))
+
+        A.empty = Instance.new("TextLabel")
+        A.empty.Size = UDim2.new(1, -24, 0, 50); A.empty.Position = UDim2.new(0, 12, 0, 70)
+        A.empty.BackgroundTransparency = 1; A.empty.Text = "Chưa bật tính năng nào"
+        A.empty.TextColor3 = Color3.fromRGB(140, 145, 160)
+        A.empty.Font = Enum.Font.Gotham; A.empty.TextSize = 13
+        A.empty.Visible = false
+        A.empty.Parent = P
+
+        A.panel = P
+    end
+
+    function A.openPanel()
+        if not A.panel then A.build() end
+        A.panel.Position = UDim2.new(0, 10, 0, 64)
+        A.panel.Visible = true
+        TweenService:Create(A.panel, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.new(0, 10, 0, 54)}):Play()
+        A.refresh()
+    end
+
+    function A.closePanel()
+        if A.panel then A.panel.Visible = false end
+    end
+
     -- ============ SỰ KIỆN HALLOWEEN ============
     -- Kích hoạt: bấm 📥, dán chữ  halloween  hoặc  🎃  hoặc  alatfera_halloween  rồi bấm Áp Dụng Config.
     -- Trình tự: thông báo chào mừng -> chờ 3 giây -> ảnh bìa phủ kín màn hình (có hiệu ứng) -> 1 giây sau ảnh biến mất
@@ -3903,7 +4369,7 @@ function AlatferaLib.CreateWindow(config)
     function H.style(obj)
         if not H.active then return end
         if obj == H.bgImg or obj == H.bgFallback or obj == H.dimFrame then return end
-        if obj:GetAttribute("HDecor") then return end
+        if obj:GetAttribute("HDecor") or obj:GetAttribute("HSkip") then return end
         if obj:IsA("UIStroke") then
             if obj:GetAttribute("HOrigStroke") == nil and H.prev.stroke and H.sameColor(obj.Color, H.prev.stroke) then
                 obj:SetAttribute("HOrigStroke", obj.Color)
